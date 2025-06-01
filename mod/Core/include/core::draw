@@ -1,0 +1,7 @@
+// Created by Lua (TeamPuzel) on May 25th 2025.
+// Copyright (c) 2025 All rights reserved.
+#pragma once
+
+#include "../src/draw/Color.hpp"
+#include "../src/draw/Drawable.hpp"
+#include "../src/draw/Image.hpp"
