@@ -1,29 +1,58 @@
 // Created by Lua (TeamPuzel) on May 26th 2025.
 // Copyright (c) 2025 All rights reserved.
 #pragma once
-#include <core>
+#include <primitive>
+#include <rt>
+#include <vector>
 #include "Scene.hpp"
-#include "Entity.hpp"
-#include "Tile.hpp"
+#include "Object.hpp"
 
 namespace sonic {
     struct StageData final {};
 
-    /// A coroutine class representing the game state of a loaded stage.
+    struct Tile final {
+        i32 x, y;
+        bool mirror_x;
+        bool mirror_y;
+    };
+
+    /// A coroutine class representing the state of a loaded stage.
     class Stage final : Scene {
-        core::Array<Entity*> entities;
-        core::Array<Tile const*> tiles;
+        u32 width { 0 };
+        u32 height { 0 };
+        std::vector<Tile> foreground;
+        std::vector<Tile> collision;
+        std::vector<Object*> objects;
+
+        Stage() {}
 
       public:
         void update() override {}
-        void draw(core::draw::dyn::SizedMutableDrawable& target) const override {}
+        void draw(draw::Image& target) const override {}
 
-        auto load(StageData const& data) -> Stage {
-            core::todo();
-        };
+        auto load(char const* filename) -> Stage {
+            auto ret = Stage();
 
-        auto load(char const* data_path) -> Stage {
-            core::todo();
+            const auto data = rt::load(filename);
+            auto reader = rt::BinaryReader::of(data);
+
+            ret.width = reader.read<u32>();
+            ret.height = reader.read<u32>();
+
+            ret.foreground.reserve(ret.width * ret.height);
+            ret.collision.reserve(ret.width * ret.height);
+
+            for (auto tile : reader.read<Tile>(ret.width * ret.height)) {
+                ret.foreground.push_back(tile);
+            }
+
+            for (auto tile : reader.read<Tile>(ret.width * ret.height)) {
+                ret.collision.push_back(tile);
+            }
+
+            // TODO: Objects
+
+            return ret;
         }
     };
 }
