@@ -2,3 +2,4 @@
 
 #include "../primitive/Primitive.hpp"
 #include "../primitive/Fixed.hpp"
+#include "../primitive/Box.hpp"

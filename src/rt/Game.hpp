@@ -5,27 +5,294 @@
 #pragma once
 #include <primitive>
 #include <draw>
-#include <concepts>
 #include <string>
 #include <optional>
 #include <atomic>
+#include <unordered_set>
+#include <iostream>
 #include <SDL3/SDL.h>
 
 namespace rt {
-    /// Identifies keyboard keys.
-    ///
-    /// Only baseline keys available on most small keyboards are exposed.
-    enum class Key : u8 { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z };
-
-    /// Identifies mouse buttons.
-    ///
-    /// Only left and right are recognized as anything else is beyond baseline.
-    enum class MouseButton : u8 { Left, Right };
-
-    /// A mouse position relative to the context origin.
-    struct MousePosition final {
-        f32 x, y;
+    struct Mouse final {
+        i32 x, y;
+        bool left, right;
     };
+
+    enum class Key : u32 {
+        A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+        Backspace,
+        Left, Right, Up, Down,
+        Num0, Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9,
+        Comma, Period, Slash,
+        Backslash, Equals, Dash, BracketLeft, BracketRight,
+        Semicolon, Quote,
+        Shift, Meta, Control, Option, Tab, Enter, Escape,
+    };
+
+    struct KeyIterator final {
+        class Impl final {
+            u32 current;
+
+            Impl(u32 at) : current(at) {}
+
+          public:
+            friend struct KeyIterator;
+
+            auto operator==(Impl other) const -> bool {
+                return current == other.current;
+            }
+
+            auto operator!=(Impl other) const -> bool {
+                return current != other.current;
+            }
+
+            auto operator++() -> Impl& {
+                ++current;
+                return *this;
+            }
+
+            auto operator*() -> Key {
+                return Key(current);
+            }
+        };
+
+        auto begin() -> Impl {
+            return Impl { 0 };
+        }
+
+        auto end() -> Impl {
+            return Impl { u32(Key::Escape) + 1 };
+        }
+    };
+
+    constexpr auto all_keys() -> KeyIterator {
+        return KeyIterator();
+    }
+
+    struct KeyState final {
+        Key key;
+        i32 pressed_for { 0 };
+
+        static auto from(Key key) -> KeyState {
+            return KeyState { key };
+        }
+
+        auto pressed() const -> KeyState {
+            return KeyState { key, pressed_for + 1 };
+        }
+
+        friend constexpr auto operator==(rt::KeyState const& lhs, rt::KeyState const& rhs) noexcept -> bool {
+            return lhs.key == rhs.key;
+        }
+
+        friend constexpr auto operator!=(rt::KeyState const& lhs, rt::KeyState const& rhs) noexcept -> bool {
+            return !(lhs == rhs);
+        }
+    };
+}
+
+template <> struct std::hash<rt::KeyState> {
+    std::size_t operator()(rt::KeyState const& state) const noexcept {
+        return std::hash<u16>()(u16(state.key));
+    }
+};
+
+namespace rt::detail {
+    inline auto get_key(Key key) -> bool {
+        const auto keys = SDL_GetKeyboardState(nullptr);
+        switch (key) {
+            case Key::A: return keys[SDL_SCANCODE_A];
+            case Key::B: return keys[SDL_SCANCODE_B];
+            case Key::C: return keys[SDL_SCANCODE_C];
+            case Key::D: return keys[SDL_SCANCODE_D];
+            case Key::E: return keys[SDL_SCANCODE_E];
+            case Key::F: return keys[SDL_SCANCODE_F];
+            case Key::G: return keys[SDL_SCANCODE_G];
+            case Key::H: return keys[SDL_SCANCODE_H];
+            case Key::I: return keys[SDL_SCANCODE_I];
+            case Key::J: return keys[SDL_SCANCODE_J];
+            case Key::K: return keys[SDL_SCANCODE_K];
+            case Key::L: return keys[SDL_SCANCODE_L];
+            case Key::M: return keys[SDL_SCANCODE_M];
+            case Key::N: return keys[SDL_SCANCODE_N];
+            case Key::O: return keys[SDL_SCANCODE_O];
+            case Key::P: return keys[SDL_SCANCODE_P];
+            case Key::Q: return keys[SDL_SCANCODE_Q];
+            case Key::R: return keys[SDL_SCANCODE_R];
+            case Key::S: return keys[SDL_SCANCODE_S];
+            case Key::T: return keys[SDL_SCANCODE_T];
+            case Key::U: return keys[SDL_SCANCODE_U];
+            case Key::V: return keys[SDL_SCANCODE_V];
+            case Key::W: return keys[SDL_SCANCODE_W];
+            case Key::X: return keys[SDL_SCANCODE_X];
+            case Key::Y: return keys[SDL_SCANCODE_Y];
+            case Key::Z: return keys[SDL_SCANCODE_Z];
+
+            case Key::Backspace: return keys[SDL_SCANCODE_BACKSPACE];
+            case Key::Left:      return keys[SDL_SCANCODE_LEFT];
+            case Key::Right:     return keys[SDL_SCANCODE_RIGHT];
+            case Key::Up:        return keys[SDL_SCANCODE_UP];
+            case Key::Down:      return keys[SDL_SCANCODE_DOWN];
+
+            case Key::Num0: return keys[SDL_SCANCODE_0];
+            case Key::Num1: return keys[SDL_SCANCODE_1];
+            case Key::Num2: return keys[SDL_SCANCODE_2];
+            case Key::Num3: return keys[SDL_SCANCODE_3];
+            case Key::Num4: return keys[SDL_SCANCODE_4];
+            case Key::Num5: return keys[SDL_SCANCODE_5];
+            case Key::Num6: return keys[SDL_SCANCODE_6];
+            case Key::Num7: return keys[SDL_SCANCODE_7];
+            case Key::Num8: return keys[SDL_SCANCODE_8];
+            case Key::Num9: return keys[SDL_SCANCODE_9];
+
+            case Key::Comma:        return keys[SDL_SCANCODE_COMMA];
+            case Key::Period:       return keys[SDL_SCANCODE_PERIOD];
+            case Key::Slash:        return keys[SDL_SCANCODE_SLASH];
+            case Key::Backslash:    return keys[SDL_SCANCODE_BACKSLASH];
+            case Key::Equals:       return keys[SDL_SCANCODE_EQUALS];
+            case Key::Dash:         return keys[SDL_SCANCODE_MINUS];
+            case Key::BracketLeft:  return keys[SDL_SCANCODE_LEFTBRACKET];
+            case Key::BracketRight: return keys[SDL_SCANCODE_RIGHTBRACKET];
+            case Key::Semicolon:    return keys[SDL_SCANCODE_SEMICOLON];
+            case Key::Quote:        return keys[SDL_SCANCODE_APOSTROPHE];
+            case Key::Shift:        return keys[SDL_SCANCODE_LSHIFT] or keys[SDL_SCANCODE_RSHIFT];
+            case Key::Meta:         return keys[SDL_SCANCODE_LGUI] or keys[SDL_SCANCODE_RGUI];
+            case Key::Control:      return keys[SDL_SCANCODE_LCTRL] or keys[SDL_SCANCODE_RCTRL];
+            case Key::Option:       return keys[SDL_SCANCODE_LALT] or keys[SDL_SCANCODE_RALT];
+            case Key::Tab:          return keys[SDL_SCANCODE_TAB];
+            case Key::Enter:        return keys[SDL_SCANCODE_RETURN];
+            case Key::Escape:       return keys[SDL_SCANCODE_ESCAPE];
+        }
+    }
+}
+
+namespace rt {
+    class Input {
+        std::optional<Mouse> mouse_state;
+        std::unordered_set<KeyState> keys;
+
+      protected:
+        void press(Key key) {
+            if (auto existing = keys.extract(KeyState::from(key))) {
+                keys.insert(existing.value().pressed());
+            } else {
+                keys.insert(KeyState::from(key));
+            }
+        }
+
+        void unpress(Key key) {
+            (void) keys.extract(KeyState::from(key));
+        }
+
+        auto mouse() -> std::optional<Mouse>& {
+            return mouse_state;
+        }
+
+      public:
+        Input(Input const&) = delete;
+        auto operator=(Input const&) -> Input& = delete;
+
+        Input() {}
+
+        auto mouse() const -> std::optional<Mouse> const& {
+            return mouse_state;
+        }
+
+        auto key_pressed(Key key) const -> bool {
+            if (auto k = keys.find(KeyState::from(key)); k != keys.end()) {
+                return (*k).pressed_for == 0;
+            } else {
+                return false;
+            }
+        }
+
+        auto key_held(Key key) const -> bool {
+            return keys.find(KeyState::from(key)) != keys.end();
+        }
+
+        auto key_repeating(Key key, i32 delay, i32 interval) const -> bool {
+            // If there is no matching key, it can't be pressed.
+            const auto ki = keys.find(KeyState::from(key));
+            if (ki == keys.end()) return false;
+            const auto k = *ki;
+
+            // If the key matched and it was just pressed it counts as the first press before the delay.
+            if (k.pressed_for == 0) return true;
+            // If we have not reached the delay the input doesn't count.
+            if (k.pressed_for < delay) return false;
+
+            // Now we can start repeating at the specified interval.
+            const auto start = k.pressed_for - delay;
+            return start % interval == 0; // start.isMultiple(of: interval)
+        }
+    };
+
+    class ManagedSdlInput final : public Input {
+      public:
+        void poll() {
+            // TODO: Apply scale to mouse input. Unused in this game anyway so it's whatever.
+            float x, y;
+            auto btn = SDL_GetMouseState(&x, &y);
+            i32 ix = i32(x), iy = i32(y);
+            mouse() = Mouse {
+                ix, iy,
+                (btn & SDL_BUTTON_LMASK) ? true : false,
+                (btn & SDL_BUTTON_RMASK) ? true : false,
+            };
+
+            for (const auto key : all_keys()) {
+                if (detail::get_key(key)) {
+                    this->press(key);
+                } else {
+                    this->unpress(key);
+                }
+            }
+        }
+    };
+
+    /// Returns a concrete subtype of Input with a managed `poll()` interface.
+    /// The exact type could change in the future.
+    inline auto input() {
+        return ManagedSdlInput {};
+    }
+
+    class ManagedSdlRefreshRateLock final {
+        u32 rate;
+
+      public:
+        void poll(SDL_Window * window) {
+            auto mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+            this->rate = mode->refresh_rate_numerator;
+        }
+
+        auto compatible_with_tick(u32 tick) const -> bool {
+            return rate % tick == 0;
+        }
+
+        /// Given the frame count and a target hertz makes an effort to invoke the provided callable
+        /// at a consistent rate in sync with the display, ideally by alternating frames on which
+        /// it attempts to draw when the rate is divisible or close to it.
+        template <typename Fn> [[nodiscard]] auto sync(usize frame, u32 desired_rate, Fn f) const -> bool {
+            if (desired_rate == 0) throw std::runtime_error("Division by zero");
+            if (compatible_with_tick(desired_rate)) {
+                const auto tick_frames = rate / desired_rate;
+
+                if (tick_frames != 0 and frame % tick_frames == 0) {
+                    f();
+                }
+
+                return true;
+            } else {
+                return false;
+            }
+        }
+    };
+
+    /// Returns a concrete type implementing the refresh rate interface.
+    /// The exact type could change in the future.
+    inline auto refresh_rate_lock() {
+        return ManagedSdlRefreshRateLock {};
+    }
 
     /// Defines a game runnable by a game executor. The default is `run(game)`.
     ///
@@ -37,14 +304,12 @@ namespace rt {
     /// The catch is, without C++20 modules, this means the run implementation must be a template,
     /// so it is impossible for it to avoid exposing SDL includes, but that's an arbitrary
     /// issue caused by being forced to support old C++.
-    ///
-    /// TODO(last commit): Convert concept to type trait.
-    template <typename Self, typename Target = draw::Image>
-    concept Game =
-        draw::SizedMutableDrawable<Target> and requires(Self& game_mut, Self const& game, Target& target) {
-            { game_mut.update() } -> std::same_as<void>;
-            { game.draw(target) } -> std::same_as<void>;
-        };
+    template <typename, typename = draw::Image, typename = void> struct Game : std::false_type {};
+    template <typename Self, typename Target> struct Game<Self, Target, std::enable_if_t<
+        draw::SizedDrawable<Target>::value and draw::MutableDrawable<Target>::value and
+        std::is_same<decltype(std::declval<Self&>().update(std::declval<Input const&>())), void>::value and
+        std::is_same<decltype(std::declval<Self const&>().draw(std::declval<Target&>())), void>::value
+    >> : std::true_type {};
 
     /// An error raised while running the game using the default executor.
     struct RunError final {
@@ -68,29 +333,31 @@ namespace rt {
     /// This method was moved from Game into an environment message.
     /// A game cannot run itself, it is run by the platform it's on
     /// and can be run in many ways, this is just one implementation.
-    static void run(Game auto& game, char const* title, i32 scale, i32 width, i32 height) {
+    template <typename G> static void run(G& game, char const* title, i32 scale, i32 width, i32 height) {
+        static_assert(Game<G>::value);
+
         static std::atomic<bool> is_running = false;
 
         if (is_running.load()) {
-            throw RunError { .reason = RunError::Reason::AlreadyRunning };
+            throw RunError { RunError::Reason::AlreadyRunning };
         } else {
             is_running.store(true);
         }
 
         if (not SDL_Init(SDL_INIT_VIDEO)) {
             throw RunError {
-                .reason = RunError::Reason::CouldNotInitializeSdl,
-                .description = SDL_GetError(),
+                RunError::Reason::CouldNotInitializeSdl,
+                SDL_GetError(),
             };
         }
 
-        auto const window = SDL_CreateWindow(
+        auto window = SDL_CreateWindow(
             title, width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY
         );
         if (not window) {
             throw RunError {
-                .reason = RunError::Reason::CouldNotCreateWindow,
-                .description = SDL_GetError(),
+                RunError::Reason::CouldNotCreateWindow,
+                SDL_GetError(),
             };
         }
         SDL_SetWindowMinimumSize(window, width, height);
@@ -102,11 +369,11 @@ namespace rt {
         // acceleration to begin with, the only API that should be used is a platform specific
         // synchronization primitive such as CADisplayLink on macOS. That would also properly
         // support variable refresh rates on such platforms which I am unsure SDL actually handles.
-        auto const renderer = SDL_CreateRenderer(window, nullptr);
+        auto renderer = SDL_CreateRenderer(window, nullptr);
         if (not renderer) {
             throw RunError {
-                .reason = RunError::Reason::CouldNotCreateRenderer,
-                .description = SDL_GetError(),
+                RunError::Reason::CouldNotCreateRenderer,
+                SDL_GetError(),
             };
         }
         // We can discard the error, it is inefficient not to use vsync but if a platform doesn't support it
@@ -135,8 +402,8 @@ namespace rt {
             );
             if (not texture) {
                 throw RunError {
-                    .reason = RunError::Reason::CouldNotCreateTexture,
-                    .description = SDL_GetError(),
+                    RunError::Reason::CouldNotCreateTexture,
+                    SDL_GetError(),
                 };
             }
             SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
@@ -144,7 +411,10 @@ namespace rt {
         resize_texture(width / scale, height / scale);
 
         SDL_Event event;
+        usize frame = 0;
         auto target = draw::Image(width / scale, height / scale);
+        auto input = rt::input();
+        auto rate = rt::refresh_rate_lock();
 
         while (true) {
             while (SDL_PollEvent(&event)) {
@@ -165,9 +435,17 @@ namespace rt {
                 }
             }
 
-            // FIXME: Updates should be ensured as 60hz.
-            game.update();
-            game.draw(target);
+            // Ensure stable 60hz.
+            rate.poll(window);
+            const auto could_sync = rate.sync(frame, 60, [&]{
+                input.poll();
+                game.update(input);
+                game.draw(target);
+            });
+            if (not could_sync) {
+                // TODO: Show diagnostic message in the corner or something instead.
+                std::cerr << "Could not synchronize the refresh rate" << std::endl;
+            }
 
             SDL_RenderClear(renderer);
 
@@ -175,17 +453,19 @@ namespace rt {
 
             if (not SDL_RenderTexture(renderer, texture, nullptr, nullptr)) {
                 throw RunError {
-                    .reason = RunError::Reason::CouldNotRenderTexture,
-                    .description = SDL_GetError(),
+                    RunError::Reason::CouldNotRenderTexture,
+                    SDL_GetError(),
                 };
             }
 
             if (not SDL_RenderPresent(renderer)) {
                 throw RunError {
-                    .reason = RunError::Reason::CouldNotPresentToWindow,
-                    .description = SDL_GetError(),
+                    RunError::Reason::CouldNotPresentToWindow,
+                    SDL_GetError(),
                 };
             }
+
+            frame += 1;
         }
     end:
 
@@ -203,7 +483,8 @@ namespace rt {
     /// and can be run in many ways, this is just one implementation.
     ///
     /// This overload uses the default window size of 800x600.
-    inline void run(Game auto& game, char const* title = "Window", i32 scale = 4) {
+    template <typename G> void run(G& game, char const* title = "Window", i32 scale = 4) {
+        static_assert(Game<G>::value);
         run(game, title, scale, 800, 600);
     }
 }

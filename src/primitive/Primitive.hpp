@@ -8,6 +8,7 @@
 // This avoids common bugs like assuming signedness or size of primitives, which does differ between platforms.
 // The header also asserts that certain poorly defined operations evaluate as expected.
 #pragma once
+#include <type_traits>
 
 using f32 = float;
 using f64 = double;
@@ -59,6 +60,28 @@ static_assert(-4 >> 1 == -2, ">> doesn't do sign extension");
 // C++ does not define the representation of signed primitives either.
 // Assert that this is a modern and sensible compiler/architecture.
 // This is a requirement. Code can rely on this representation from this point on.
-static_assert(static_cast<i8>(-1) == ~i8(0), "Platform is not using two's complement");
-static_assert(static_cast<i32>(-1) == ~i32(0), "Platform is not using two's complement");
-static_assert(static_cast<i64>(-1) == ~i64(0), "Platform is not using two's complement");
+static_assert(static_cast<i8>(-1) == ~i8(0), "Compiler is not using two's complement");
+static_assert(static_cast<i32>(-1) == ~i32(0), "Compiler is not using two's complement");
+static_assert(static_cast<i64>(-1) == ~i64(0), "Compiler is not using two's complement");
+
+namespace endian {
+    template <typename T, typename... Bytes> constexpr auto from_le_bytes(Bytes... bytes) -> T {
+        static_assert(sizeof...(Bytes) == sizeof(T), "Incorrect number of bytes");
+        static_assert(std::is_integral<T>::value, "T must be an integral type");
+
+        T value = 0;
+        u8 data[] = { static_cast<u8>(bytes)... };
+        for (usize i = 0; i < sizeof(T); i += 1) value |= data[i] << (i * 8);
+        return value;
+    }
+
+    template <typename T, typename... Bytes> constexpr auto from_be_bytes(Bytes... bytes) -> T {
+        static_assert(sizeof...(Bytes) == sizeof(T), "Incorrect number of bytes");
+        static_assert(std::is_integral<T>::value, "T must be an integral type");
+
+        T value = 0;
+        u8 data[] = { static_cast<u8>(bytes)... };
+        for (usize i = 0; i < sizeof(T); i += 1) value |= data[i] << ((sizeof(T) - 1 - i) * 8);
+        return value;
+    }
+}

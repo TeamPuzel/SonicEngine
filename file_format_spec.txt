@@ -2,8 +2,8 @@
 The file formats used by the game are very simple.
 - The map directory which contains the tiled project provides an extension capable of
 writing this custom format.
-- Images on the other hand use an uncompressed BGRA only subset of the TGA image format
-which is the only trivially implementable format modern image editors can export.
+- Images on the other hand use an uncompressed BGRA-only subset of the TGA image format
+which is the only trivially implementable format modern image editors still export.
 
 The following is a fairly intuitive language-like logical representation of the
 file structure. The data is not padded.
@@ -12,7 +12,7 @@ file(.stage) struct Stage : little_endian {
     width: u32,
     height: u32,
     foreground: [Tile; width * height],
-    collision: [Tile; width * height],
+    collision: [SolidTile; width * height],
     object_count: u32,
     objects: [Object; object_count],
 }
@@ -20,6 +20,21 @@ file(.stage) struct Stage : little_endian {
 struct Tile {
     x: i32,
     y: i32,
+    mirror_x: bool,
+    mirror_y: bool,
+}
+
+enum Solidity : u8 {
+    Full,
+    Top,
+    SidesAndBottom,
+}
+
+struct SolidTile {
+    x: i32,
+    y: i32,
+    angle: u16,
+    solidity: Solidity,
     mirror_x: bool,
     mirror_y: bool,
 }

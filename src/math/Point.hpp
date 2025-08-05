@@ -8,5 +8,8 @@
 namespace math {
     template <typename T> struct [[clang::trivial_abi]] point final { // NOLINT(readability-identifier-naming)
         T x, y;
+
+        constexpr point() : x(0), y(0) {}
+        constexpr point(T x, T y) : x(x), y(y) {}
     };
 }

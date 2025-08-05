@@ -28,9 +28,11 @@ The project can be built on any platform using CMake or Visual Studio. The depen
 
 ## How to play
 
-- Move with arrow keys
-- Jump with X
-- Press down arrow to crouch when standing still or roll up when moving.
+The controls can be operated in left handed and right handed modes:
+- Move with arrow keys and jump with X
+- Move with WASD keys and jump with ENTER
+
+Press down to crouch when standing still or roll up when moving.
 
 There were no other abilities in Sonic 1 yet.
 
@@ -38,15 +40,39 @@ Note that in Sonic 1 there is a speed cap unless rolled up so that would be the 
 
 ## Class structure
 
-TBD
+The game itself uses a very boring, standard class structure.
+
+```
+Game -> Scene
+          |-> Stage -> [Object]
+          |-> ... and many other simple scenes like the opening screen or death screen.
+```
 
 ### Object composition
 
-TBD
+The top of the `Drawable.hpp` header has *very* comprehensive documentation of composition
+using complex std::ranges inspired adapters which is used for generic composition of drawing operations.
+
+That's probably the most notable example since I have a lot of code here and can't realistically describe everything.
 
 ### Inheritance
 
-TBD
+There are two main (both flat) inheritance hierarchies in the gameplay implementation itself:
+- Scene, something currently being rendered and updated by the game.
+- Object, a supertype to all dynamic (non-tile) game objects.
+
+There's some other minor uses of inheritance mainly for metaprogramming purposes. Most of my abstraction
+is achieved through C++ traits rather than inheritance.
+
+There is more advanced subtyping present with a deeper subtyping hierarchy but it is again using traits for efficiency.
+Specifically, `Drawable` the infinite supertype of all graphics, `SizedDrawable`, subtype of `Drawable` describing a concrete
+area of the conceptual infinite plane, `MutableDrawable` which is quite self explanatory and (an unwritten, used individually) intersection of
+these two `Drawable` subtypes required for rendering, `SizedDrawable + MutableDrawable` or in other words `SizedMutableDrawable`.
+This is beyond the capability of most inheritance systems and while C++ has multiple inheritance this is not expressible
+well and on top of that INCREDIBLY inefficient. As soon as these traits would implement virtual dispatch C++ compilers
+would never optimize and devirtualize them (I have tested it). Dynamic, uninlined dispatch through a dozen nested virtual
+calls for every single pixel drawn is painfully slow, obviously, and is very viral in that these dynamic constructs can
+only deal with other dynamic constructs themselves, propagating inefficiency all the way through.
 
 ## Contact
 
@@ -54,6 +80,4 @@ TODO
 
 ## Acknowledgements
 
-- [The definition of Object Oriented Programming as intended by Alan Kay](https://youtu.be/QjJaFG63Hlo?si=7Vs-8_V1AsO8N8nx)
-- [Mutable Value Semantics](https://www.youtube.com/watch?v=QthAU-t3PQ4)
 - [Sonic Physics Guide](https://info.sonicretro.org/Sonic_Physics_Guide)

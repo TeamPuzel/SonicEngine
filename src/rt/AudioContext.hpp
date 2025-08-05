@@ -3,7 +3,7 @@
 //
 // The audio context header defines audio functionality.
 // Normally I handle audio manually by computing a buffered waveform and maintaining its playback.
-// For this game however it should be sufficient to offload the implementation to SDL2.
+// For this game however it should be sufficient to offload the implementation to SDL3.
 #pragma once
 #include <primitive>
 

@@ -36,11 +36,12 @@ namespace draw {
 
         /// Initializes the image with the provided function of signature:
         /// (x: i32, y: i32) -> Color
-        Image(i32 width, i32 height, auto init) : w(width), h(height) {
+        template <typename F> Image(i32 width, i32 height, F init) : w(width), h(height) {
             data.reserve(width * height);
+            data.resize(width * height);
             for (i32 x = 0; x < width; x += 1) {
                 for (i32 y = 0; y < height; y += 1) {
-                    data.push_back(init(x, y));
+                    data.at(x + y * width) = init(x, y);
                 }
             }
         }
@@ -80,7 +81,49 @@ namespace draw {
         auto raw() -> Color* {
             return data.data();
         }
+
+        template <typename U> static auto flatten(U const& other) -> Image {
+            static_assert(SizedDrawable<U>::value);
+            return Image(other.width(), other.height(), [&] (i32 x, i32 y) -> Color {
+                return other.get(x, y);
+            });
+        }
     };
 
-    static_assert(SizedMutableDrawable<Image>);
+    // Assert that our type properly satisfies the desired interface.
+    static_assert(MutableDrawable<Image>::value and SizedDrawable<Image>::value);
+
+    class TgaImage final {
+        std::vector<u8> data;
+
+        struct BGRA final {
+            u8 b, g, r, a;
+
+            constexpr operator Color() const noexcept {
+                return Color::rgba(r, g, b, a);
+            }
+        };
+
+        TgaImage(std::vector<u8> data) : data(std::move(data)) {}
+
+      public:
+        auto width() const -> i32 {
+            return *reinterpret_cast<u16 const*>(data.data() + 12);
+        }
+
+        auto height() const -> i32 {
+            return *reinterpret_cast<u16 const*>(data.data() + 14);
+        }
+
+        auto get(i32 x, i32 y) const -> Color {
+            return *reinterpret_cast<BGRA const*>(data.data() + 18 + (x + y * width()) * sizeof(BGRA));
+        }
+
+        static auto from(std::vector<u8> data) -> TgaImage {
+            return TgaImage(std::move(data));
+        }
+    };
+
+    // Assert that our type properly satisfies the desired interface.
+    static_assert(SizedDrawable<TgaImage>::value);
 }

@@ -19,7 +19,7 @@ namespace math {
 
       public:
         [[clang::always_inline]]
-        constexpr explicit(false) operator u32() const {
+        constexpr operator u32() const {
             return raw;
         }
     };

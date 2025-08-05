@@ -95,6 +95,12 @@ const sonicFileFormat = {
         /** @type TileLayer */
         const collision = map.layers.find((l) => l.name == "collision");
         assert(collision.isTileLayer);
+        /** @type TileLayer */
+        const angles = map.layers.find((l) => l.name == "angles");
+        assert(angles.isTileLayer);
+        /** @type TileLayer */
+        const solidity = map.layers.find((l) => l.name == "solidity");
+        assert(solidity.isTileLayer);
         /** @type ObjectGroup */
         const objects = map.layers.find((l) => l.name == "objects");
         assert(objects.isObjectLayer);
@@ -102,7 +108,7 @@ const sonicFileFormat = {
         const data = new ArrayBuffer(
             8                                         // width and height of the stage
             + (map.width * map.height * 10)           // visual data
-            + (map.width * map.height * 10)           // collision data
+            + (map.width * map.height * 13)           // collision data
             + 4                                       // object count
             + (objects.objectCount * (64 + 8 + 1024)) // object data
         );
@@ -132,15 +138,23 @@ const sonicFileFormat = {
         for (let x = 0; x < map.width; x += 1) {
             for (let y = 0; y < map.height; y += 1) {
                 const tile = collision.cellAt(x, y);
-                assert(tile.tileId >= -1)
+                const solid = solidity.cellAt(x, y);
+                const angle = angles.cellAt(x, y);
+
+                assert(tile.tileId >= -1);
+
                 if (tile.empty) {
                     writer.i32(-1);
                     writer.i32(-1);
+                    writer.u16(0);
+                    writer.u8(0);
                     writer.bool(0);
                     writer.bool(0);
                 } else {
                     writer.i32(tile.tileId % 32);
                     writer.i32(Math.floor(tile.tileId / 32));
+                    writer.u16(angle.tileId);
+                    writer.u8(solid.tileId + 1)
                     writer.bool(tile.flippedHorizontally);
                     writer.bool(tile.flippedVertically);
                 }
@@ -152,7 +166,7 @@ const sonicFileFormat = {
         for (let i = 0; i < objects.objectCount; i += 1) {
             const object = objects.objectAt(i);
 
-            writer.cString(object.className, 64);
+            writer.cString(object.name, 64);
             writer.i32(Math.round(object.x));
             writer.i32(Math.round(object.y));
             writer.skip(1024);

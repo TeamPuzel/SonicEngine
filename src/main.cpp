@@ -6,20 +6,33 @@
 #include <sonic>
 
 class SonicGame final {
-    draw::Image tilemap;
+    draw::Image sheet;
+    draw::Image height_arrays;
+    draw::Image angle_sheet;
+    box<sonic::Scene> scene;
 
   public:
     SonicGame() {
-        // this->tilemap = draw::TgaImage::from(sonic::rt::load("tilemap.tga"))
-        //     | draw::flatten<draw::Image>();
+        this->sheet = draw::TgaImage::from(rt::load("res/tilemap.tga")) | draw::flatten<draw::Image>();
+        this->height_arrays = draw::TgaImage::from(rt::load("res/collision.tga")) | draw::flatten<draw::Image>();
+        this->angle_sheet = draw::TgaImage::from(rt::load("res/angles.tga")) | draw::flatten<draw::Image>();
+
+        this->scene = sonic::Stage::load(
+            "res/1-1.stage",
+            sonic::registry,
+            std::as_const(height_arrays) | draw::as_slice()
+        );
     }
 
-    void update() {}
+    void update(rt::Input const& input) {
+        scene->update(input);
+    }
 
-    void draw(draw::SizedMutableDrawable auto& target) const {
-        target
-            | draw::clear(draw::color::pico::DARK_BLUE)
-            | draw::pixel(1, 1, draw::color::pico::RED);
+    template <typename T> void draw(T& target) const {
+        static_assert(draw::SizedDrawable<T>::value and draw::MutableDrawable<T>::value);
+
+        target | draw::clear();
+        scene->draw(target, sheet);
     }
 };
 

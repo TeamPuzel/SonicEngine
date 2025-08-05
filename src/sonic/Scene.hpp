@@ -5,6 +5,7 @@
 #pragma once
 #include <primitive>
 #include <draw>
+#include <rt>
 
 namespace sonic {
     /// A scene coroutine which can be run.
@@ -13,8 +14,9 @@ namespace sonic {
     /// significantly faster for obvous reasons and we control the runtime and can ensure it is one.
     struct Scene {
         /// Advances the state by 1/60 of a second.
-        virtual void update() = 0;
+        virtual void update(rt::Input const& input) = 0;
         /// Called after update to mutate the render target.
-        virtual void draw(draw::Image& target) const = 0;
+        virtual void draw(draw::Image& target, draw::Image const& sheet) const = 0;
+        virtual ~Scene() noexcept {}
     };
 }
