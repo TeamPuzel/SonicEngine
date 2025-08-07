@@ -15,8 +15,6 @@ namespace draw {
     /// The simplest sized primitive, it makes for a general purpose read/write drawable.
     ///
     /// The state surrounding the described sized area is always clear.
-    ///
-    /// The empty state of an image is equivalent to zero initialization.
     class Image final {
         std::vector<Color> data;
         i32 w, h;
@@ -25,14 +23,10 @@ namespace draw {
         /// The default, empty image of nil proportions.
         Image() : w(0), h(0) {}
 
-        Image(i32 width, i32 height, Color default_color = color::CLEAR) : w(width), h(height) {
-            data.reserve(width * height);
-            for (i32 x = 0; x < width; x += 1) {
-                for (i32 y = 0; y < height; y += 1) {
-                    data.push_back(default_color);
-                }
-            }
-        }
+        Image(Image const&) = delete;
+        auto operator=(Image const&) -> Image& = delete;
+        Image(Image&&) = default;
+        auto operator=(Image&&) -> Image& = default;
 
         /// Initializes the image with the provided function of signature:
         /// (x: i32, y: i32) -> Color
@@ -44,6 +38,14 @@ namespace draw {
                     data.at(x + y * width) = init(x, y);
                 }
             }
+        }
+
+        Image(i32 width, i32 height) : Image(width, height, [] (i32 x, i32 y) { return color::CLEAR; }) {}
+
+        auto clone() const -> Image {
+            return Image(w, h, [this] (i32 x, i32 y) -> Color {
+                return this->get(x, y);
+            });
         }
 
         void resize(i32 width, i32 height) {

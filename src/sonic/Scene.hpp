@@ -2,6 +2,7 @@
 // Copyright (c) 2025 All rights reserved.
 //
 // A simple abstraction for switching scenes at runtime.
+// Can be used for the stage, menu etc.
 #pragma once
 #include <primitive>
 #include <draw>
@@ -16,7 +17,7 @@ namespace sonic {
         /// Advances the state by 1/60 of a second.
         virtual void update(rt::Input const& input) = 0;
         /// Called after update to mutate the render target.
-        virtual void draw(draw::Image& target, draw::Image const& sheet) const = 0;
+        virtual void draw(draw::Ref<draw::Image> target, draw::Ref<const draw::Image> sheet, draw::Ref<const draw::Image> background) const = 0;
         virtual ~Scene() noexcept {}
     };
 }

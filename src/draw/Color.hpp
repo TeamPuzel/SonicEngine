@@ -21,6 +21,14 @@ namespace draw {
         template <typename Blend> constexpr auto blend_under(Color other, Blend const& blend) const -> Color {
             return blend(other, *this);
         }
+
+        constexpr auto operator==(Color other) const -> bool {
+            return r == other.r and g == other.g and b == other.b and a == other.a;
+        }
+
+        constexpr auto operator!=(Color other) const -> bool {
+            return !(*this == other);
+        }
     };
 
     namespace blend {
@@ -55,7 +63,7 @@ namespace draw {
     namespace color {
         constexpr Color CLEAR = Color::rgba(0, 0, 0, 0);
         constexpr Color WHITE = Color::rgba(255, 255, 255);
-        constexpr Color BLACK = Color::rgba(0, 0, 0, 255);
+        constexpr Color BLACK = Color::rgba(0, 0, 0);
     }
 
     namespace color::pico {

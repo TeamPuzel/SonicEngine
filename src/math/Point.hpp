@@ -11,5 +11,21 @@ namespace math {
 
         constexpr point() : x(0), y(0) {}
         constexpr point(T x, T y) : x(x), y(y) {}
+
+        constexpr auto operator+(point const& other) const -> point {
+            return point { x + other.x, y + other.y };
+        }
+
+        constexpr auto operator-(point const& other) const -> point {
+            return point { x + other.x, y + other.y };
+        }
+
+        constexpr void operator+=(point const& other) {
+            *this = point { x + other.x, y + other.y };
+        }
+
+        constexpr void operator-=(point const& other) {
+            *this = point { x + other.x, y + other.y };
+        }
     };
 }

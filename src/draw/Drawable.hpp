@@ -137,7 +137,7 @@ namespace draw::dyn {
 
 /// Performs forwarding adapter composition. Based on the design of std::ranges.
 template <typename Self, typename Adapt>
-auto operator|(Self&& self, Adapt&& adapt) -> decltype(std::forward<Adapt>(adapt)(std::forward<Self>(self))) {
+constexpr auto operator|(Self&& self, Adapt&& adapt) -> decltype(std::forward<Adapt>(adapt)(std::forward<Self>(self))) {
     return std::forward<Adapt>(adapt)(std::forward<Self>(self));
 }
 
@@ -146,7 +146,7 @@ auto operator|(Self&& self, Adapt&& adapt) -> decltype(std::forward<Adapt>(adapt
 /// Comparing infinite drawables is often possible through various tricks based on the math behind
 /// its infinite size, except for some truly infinite planes like an InfiniteImage (type not implemented in the C++ version).
 template <typename L, typename R, std::enable_if_t<draw::SizedDrawable<L>::value and draw::SizedDrawable<R>::value> = 0>
-auto operator==(L const& lhs, R const& rhs) -> bool {
+constexpr auto operator==(L const& lhs, R const& rhs) -> bool {
     if (lhs.width() != rhs.width() or lhs.height() != rhs.height()) return false;
     for (i32 x = 0; x < lhs.width(); x += 1) {
         for (i32 y = 0; y < lhs.height(); y += 1) {
@@ -158,7 +158,7 @@ auto operator==(L const& lhs, R const& rhs) -> bool {
 
 /// Older C++ versions do not derive this from equality itself yet.
 template <typename L, typename R, std::enable_if_t<draw::SizedDrawable<L>::value and draw::SizedDrawable<R>::value> = 0>
-auto operator!=(L const& lhs, R const& rhs) -> bool {
+constexpr auto operator!=(L const& lhs, R const& rhs) -> bool {
     return !(lhs == rhs);
 }
 
@@ -166,7 +166,7 @@ auto operator!=(L const& lhs, R const& rhs) -> bool {
 namespace draw {
     namespace adapt {
         template <typename T> struct Flatten final {
-            template <typename U> T operator()(U const& self) const {
+            template <typename U> constexpr T operator()(U const& self) const {
                 static_assert(SizedDrawable<U>::value);
                 static_assert(PrimitiveDrawable<T, U>::value, "Only primitives can be flattened into");
 
@@ -175,7 +175,7 @@ namespace draw {
         };
     }
 
-    template <typename T> adapt::Flatten<T> flatten() {
+    template <typename T> constexpr adapt::Flatten<T> flatten() {
         return adapt::Flatten<T> {};
     }
 }
@@ -186,7 +186,7 @@ namespace draw {
         struct Clear final {
             Color color;
 
-            template <typename T> T& operator()(T& self) const {
+            template <typename T> constexpr T& operator()(T& self) const {
                 static_assert(SizedDrawable<T>::value and MutableDrawable<T>::value);
 
                 for (i32 x = 0; x < self.width(); x += 1) {
@@ -203,10 +203,10 @@ namespace draw {
             Color color;
             Blend blend_mode;
 
-            Pixel(i32 x, i32 y, Color color, Blend blend_mode)
+            constexpr Pixel(i32 x, i32 y, Color color, Blend blend_mode)
                 : x(x), y(y), color(color), blend_mode(blend_mode) {}
 
-            template <typename T> T& operator()(T& self) const {
+            template <typename T> constexpr T& operator()(T& self) const {
                 static_assert(SizedDrawable<T>::value and MutableDrawable<T>::value);
 
                 self.set(x, y, color.blend_over(self.get(x, y), blend_mode));
@@ -219,10 +219,10 @@ namespace draw {
             i32 x, y;
             Blend blend_mode;
 
-            Draw(D const& drawable, i32 x, i32 y, Blend blend_mode)
+            constexpr Draw(D const& drawable, i32 x, i32 y, Blend blend_mode)
                 : drawable(drawable), x(x), y(y), blend_mode(blend_mode) {}
 
-            template <typename T> T& operator()(T& self) const {
+            template <typename T> constexpr T& operator()(T& self) const {
                 static_assert(SizedDrawable<D>::value);
                 static_assert(SizedDrawable<T>::value and MutableDrawable<T>::value);
 
@@ -243,37 +243,60 @@ namespace draw {
         };
     }
 
-    inline adapt::Clear clear(Color color = color::CLEAR) {
+    constexpr adapt::Clear clear(Color color = color::CLEAR) {
         return adapt::Clear { color };
     }
 
-    template <typename Blend> adapt::Pixel<Blend> pixel(i32 x, i32 y, Color color, Blend blend_mode) {
+    template <typename Blend> constexpr adapt::Pixel<Blend> pixel(i32 x, i32 y, Color color, Blend blend_mode) {
         return adapt::Pixel { x, y, color, blend_mode };
     }
 
-    inline adapt::Pixel<decltype(&blend::binary)> pixel(i32 x, i32 y, Color color) {
+    constexpr adapt::Pixel<decltype(&blend::binary)> pixel(i32 x, i32 y, Color color) {
         return adapt::Pixel { x, y, color, blend::binary };
     }
 
-    template <typename D, typename Blend> adapt::Draw<D, Blend> draw(D const& drawable, i32 x, i32 y, Blend blend_mode) {
+    template <typename D, typename Blend> constexpr adapt::Draw<D, Blend> draw(D const& drawable, i32 x, i32 y, Blend blend_mode) {
         return adapt::Draw { drawable, x, y, blend_mode };
     }
 
-    template <typename D> adapt::Draw<D, decltype(&blend::binary)> draw(D const& drawable, i32 x, i32 y) {
+    template <typename D> constexpr adapt::Draw<D, decltype(&blend::binary)> draw(D const& drawable, i32 x, i32 y) {
         return adapt::Draw { drawable, x, y, blend::binary };
     }
 }
 
 // Transformation ------------------------------------------------------------------------------------------------------
 namespace draw {
+    /// A construct similar to the standard reference wrapper but exposing the drawable interface.
+    template <typename T> struct Ref final {
+        T& inner;
+
+        constexpr Ref(T& inner) : inner(inner) {}
+
+        constexpr auto width() const -> i32 {
+            return inner.width();
+        }
+
+        constexpr auto height() const -> i32 {
+            return inner.height();
+        }
+
+        constexpr auto get(i32 x, i32 y) const -> Color {
+            return inner.get(x, y);
+        }
+
+        constexpr void set(i32 x, i32 y, Color color) {
+            inner.set(x, y, color);
+        }
+    };
+
     template <typename T> class DrawableSlice final {
         static_assert(Drawable<T>::value);
 
-        T& inner;
+        T inner;
         i32 x, y, w, h;
 
       public:
-        constexpr explicit DrawableSlice(T& inner, i32 x, i32 y, i32 width, i32 height)
+        constexpr explicit DrawableSlice(T inner, i32 x, i32 y, i32 width, i32 height)
             : inner(inner), x(x), y(y), w(width), h(height) {}
 
         constexpr auto get(i32 x, i32 y) const -> Color {
@@ -324,7 +347,7 @@ namespace draw {
     template <typename T> struct DrawableGrid final {
         static_assert(Drawable<T>::value);
 
-        T& inner;
+        T inner;
         i32 item_width, item_height;
       public:
         constexpr explicit DrawableGrid(T& inner, i32 item_width, i32 item_height)
@@ -339,74 +362,193 @@ namespace draw {
         struct Slice final {
             i32 x, y, width, height;
 
-            template <typename T> auto operator()(T& inner) const -> DrawableSlice<T> {
+            template <typename T> constexpr auto operator()(T inner) const -> DrawableSlice<T> {
                 static_assert(Drawable<T>::value);
                 return DrawableSlice<T>(inner, x, y, width, height);
-            }
-
-            template <typename T> auto operator()(T const& inner) const -> DrawableSlice<const T> {
-                static_assert(Drawable<T>::value);
-                return DrawableSlice<const T>(inner, x, y, width, height);
             }
         };
 
         struct Grid final {
             i32 item_width, item_height;
 
-            template <typename T> auto operator()(T& inner) const -> DrawableGrid<T> {
+            template <typename T> constexpr auto operator()(T inner) const -> DrawableGrid<T> {
                 static_assert(Drawable<T>::value);
                 return DrawableGrid<T>(inner, item_width, item_height);
-            }
-
-            template <typename T> auto operator()(T const& inner) const -> DrawableGrid<const T> {
-                static_assert(Drawable<T>::value);
-                return DrawableGrid<const T>(inner, item_width, item_height);
             }
         };
 
         struct Shift final {
             i32 x, y;
 
-            template <typename T> auto operator()(T& inner) const -> DrawableSlice<T> {
+            template <typename T> constexpr auto operator()(T inner) const -> DrawableSlice<T> {
                 static_assert(SizedDrawable<T>::value);
                 return DrawableSlice<T>(inner, x, y, inner.width(), inner.height());
             }
         };
 
         struct AsSlice final {
-            template <typename T> auto operator()(T& inner) const -> DrawableSlice<T> {
+            template <typename T> constexpr auto operator()(T inner) const -> DrawableSlice<T> {
                 static_assert(SizedDrawable<T>::value);
                 return DrawableSlice<T>(inner, 0, 0, inner.width(), inner.height());
             }
+        };
 
-            template <typename T> auto operator()(T const& inner) const -> DrawableSlice<const T> {
-                static_assert(SizedDrawable<T>::value);
-                return DrawableSlice<const T>(inner, 0, 0, inner.width(), inner.height());
+        struct AsRef final {
+            template <typename T> constexpr auto operator()(T& inner) const -> Ref<T> {
+                return inner;
+            }
+
+            template <typename T> constexpr auto operator()(T const& inner) const -> Ref<const T> {
+                return inner;
             }
         };
     }
 
-    inline adapt::Slice slice(i32 x, i32 y, i32 width, i32 height) {
+    constexpr adapt::Slice slice(i32 x, i32 y, i32 width, i32 height) {
         return adapt::Slice { x, y, width, height };
     }
 
-    inline adapt::Grid grid(i32 item_width, i32 item_height) {
+    constexpr adapt::Grid grid(i32 item_width, i32 item_height) {
         return adapt::Grid { item_width, item_height };
     }
 
-    inline adapt::Shift shift(i32 x, i32 y) {
+    constexpr adapt::Shift shift(i32 x, i32 y) {
         return adapt::Shift { x, y };
     }
 
-    inline adapt::AsSlice as_slice() {
+    constexpr adapt::AsSlice as_slice() {
         return adapt::AsSlice {};
+    }
+
+    constexpr adapt::AsRef as_ref() {
+        return adapt::AsRef {};
     }
 }
 
 // Mapping -------------------------------------------------------------------------------------------------------------
 namespace draw {
-    namespace adapt {
+    template <typename T, typename F> struct Map final {
+        static_assert(Drawable<T>::value);
 
+        T inner;
+        F fn;
+
+        constexpr auto width() const -> i32 {
+            return inner.width();
+        }
+
+        constexpr auto height() const -> i32 {
+            return inner.height();
+        }
+
+        constexpr auto get(i32 x, i32 y) const -> Color {
+            return fn(inner.get(x, y), x, y);
+        }
+
+        constexpr void set(i32 x, i32 y, Color color) {
+            inner.set(x, y, fn(color, x, y));
+        }
+    };
+
+    template <typename T, typename F> struct MapPos final {
+        static_assert(Drawable<T>::value);
+
+        T inner;
+        F fn;
+
+        constexpr auto width() const -> i32 {
+            return inner.width();
+        }
+
+        constexpr auto height() const -> i32 {
+            return inner.height();
+        }
+
+        constexpr auto get(i32 x, i32 y) const -> Color {
+            auto [px, py] = fn(x, y);
+            return inner.get(px, py);
+        }
+
+        constexpr void set(i32 x, i32 y, Color color) {
+            auto [px, py] = fn(x, y);
+            inner.set(px, py, color);
+        }
+    };
+
+    namespace adapt {
+        template <typename F> struct Map final {
+            F fn;
+
+            template <typename T> constexpr auto operator()(T inner) const -> draw::Map<T, F> {
+                return draw::Map<T, F> { inner, fn };
+            }
+        };
+
+        template <typename F> struct MapPos final {
+            F fn;
+
+            template <typename T> constexpr auto operator()(T inner) const -> draw::MapPos<T, F> {
+                return draw::MapPos<T, F> { inner, fn };
+            }
+        };
+    }
+
+    template <typename F> constexpr adapt::Map<F> map(F fn) {
+        return adapt::Map<F> { fn };
+    }
+
+    template <typename F> constexpr adapt::MapPos<F> map_pos(F fn) {
+        return adapt::MapPos<F> { fn };
+    }
+}
+
+// Abstract ------------------------------------------------------------------------------------------------------------
+namespace draw {
+    template <typename T> struct Repeat final {
+        static_assert(SizedDrawable<T>::value);
+
+        T inner;
+
+      private:
+        static constexpr auto arithmetic_mod(i32 a, i32 b) -> i32 {
+            return (a % b + b) % b;
+        }
+
+      public:
+        constexpr auto width() const -> i32 {
+            return inner.width();
+        }
+
+        constexpr auto height() const -> i32 {
+            return inner.width();
+        }
+
+        constexpr auto get(i32 x, i32 y) const -> Color {
+            return inner.get(
+                arithmetic_mod(x, width()),
+                arithmetic_mod(y, height())
+            );
+        }
+
+        constexpr void set(i32 x, i32 y, Color color) {
+            return inner.set(
+                arithmetic_mod(x, width()),
+                arithmetic_mod(y, height()),
+                color
+            );
+        }
+    };
+
+    namespace adapt {
+        struct Repeat final {
+            template <typename T> constexpr auto operator()(T inner) const -> draw::Repeat<T> {
+                return draw::Repeat<T> { inner };
+            }
+        };
+    }
+
+    constexpr adapt::Repeat repeat() {
+        return adapt::Repeat {};
     }
 }
 
@@ -419,50 +561,56 @@ namespace draw {
         bool is_alive { true };
 
         union {
-            std::reference_wrapper<const Left> left;
-            std::reference_wrapper<const Right> right;
+            Left left;
+            Right right;
         };
 
       public:
-        EitherDrawable(Left const& value) : tag(Case::L) {
-            left = value;
-        }
-        EitherDrawable(Right const& value) : tag(Case::R) {
-            right = value;
-        }
+        constexpr EitherDrawable(Left value) : tag(Case::L), left(value) {}
+        constexpr EitherDrawable(Right value) : tag(Case::R), right(value) {}
 
-        auto width() const -> i32 {
-            static_assert(SizedDrawable<Left>::value and SizedDrawable<Right>::value);
-            switch (tag) {
-                case Case::L: return left.get().width();
-                case Case::R: return right.get().width();
+        ~EitherDrawable() noexcept {
+            if (is_alive) {
+                switch (tag) {
+                    case Case::L: left.~Left(); break;
+                    case Case::R: right.~Right(); break;
+                }
+                is_alive = false;
             }
         }
 
-        auto height() const -> i32 {
+        constexpr auto width() const -> i32 {
             static_assert(SizedDrawable<Left>::value and SizedDrawable<Right>::value);
             switch (tag) {
-                case Case::L: return left.get().height();
-                case Case::R: return right.get().height();
+                case Case::L: return left.width();
+                case Case::R: return right.width();
             }
         }
 
-        auto get(i32 x, i32 y) const -> Color {
+        constexpr auto height() const -> i32 {
+            static_assert(SizedDrawable<Left>::value and SizedDrawable<Right>::value);
             switch (tag) {
-                case Case::L: return left.get().get(x, y);
-                case Case::R: return right.get().get(x, y);
+                case Case::L: return left.height();
+                case Case::R: return right.height();
+            }
+        }
+
+        constexpr auto get(i32 x, i32 y) const -> Color {
+            switch (tag) {
+                case Case::L: return left.get(x, y);
+                case Case::R: return right.get(x, y);
             }
         }
     };
 
     namespace adapt {
-        template <typename Adapter> struct ApplyIf final {
+        template <typename F> struct ApplyIf final {
             bool cond;
-            Adapter const& fn;
+            F fn;
 
-            ApplyIf(bool cond, Adapter const& fn) : cond(cond), fn(fn) {}
+            constexpr ApplyIf(bool cond, F const& fn) : cond(cond), fn(fn) {}
 
-            template <typename T> auto operator()(T const& inner) const -> EitherDrawable<T, decltype(fn(inner))> {
+            template <typename T> constexpr auto operator()(T const& inner) const -> EitherDrawable<T, decltype(fn(inner))> {
                 if (not cond) {
                     return EitherDrawable<T, decltype(fn(inner))>(inner);
                 } else {
@@ -472,8 +620,8 @@ namespace draw {
         };
     }
 
-    template <typename Adapter> adapt::ApplyIf<Adapter> apply_if(bool cond, Adapter const& fn) {
-        return adapt::ApplyIf<Adapter> { cond, fn };
+    template <typename F> constexpr adapt::ApplyIf<F> apply_if(bool cond, F fn) {
+        return adapt::ApplyIf<F> { cond, fn };
     }
 }
 
@@ -484,19 +632,19 @@ namespace draw {
     template <const MirrorAxis AXIS, typename T> struct MirroredDrawable final {
         static_assert(SizedDrawable<T>::value);
 
-        T const& inner;
+        T inner;
 
-        explicit MirroredDrawable(T const& inner) : inner(inner) {}
+        constexpr explicit MirroredDrawable(T inner) : inner(inner) {}
 
-        auto width() const -> i32 {
+        constexpr auto width() const -> i32 {
             return inner.width();
         }
 
-        auto height() const -> i32 {
+        constexpr auto height() const -> i32 {
             return inner.height();
         }
 
-        auto get(i32 x, i32 y) const -> Color {
+        constexpr auto get(i32 x, i32 y) const -> Color {
             if constexpr (AXIS == MirrorAxis::X) {
                 return inner.get(width() - 1 - x, y);
             } else {
@@ -507,18 +655,18 @@ namespace draw {
 
     namespace adapt {
         template <const MirrorAxis AXIS> struct Mirror final {
-            template <typename T> auto operator()(T const& inner) const -> MirroredDrawable<AXIS, T> {
+            template <typename T> constexpr auto operator()(T inner) const -> MirroredDrawable<AXIS, T> {
                 static_assert(SizedDrawable<T>::value);
                 return MirroredDrawable<AXIS, T>(inner);
             }
         };
     }
 
-    inline adapt::Mirror<MirrorAxis::X> mirror_x() {
+    constexpr adapt::Mirror<MirrorAxis::X> mirror_x() {
         return adapt::Mirror<MirrorAxis::X> {};
     }
 
-    inline adapt::Mirror<MirrorAxis::Y> mirror_y() {
+    constexpr adapt::Mirror<MirrorAxis::Y> mirror_y() {
         return adapt::Mirror<MirrorAxis::Y> {};
     }
 }

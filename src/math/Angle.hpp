@@ -7,20 +7,42 @@
 
 namespace math {
     /// The original game uses 8 bit angles ranged 0...255 rather than 0...359.
-    /// Thanks to that decision angle semantics are already provided to us by the CPU itself.
+    /// Thanks to that decision angle semantics were already provided to us by the CPU itself.
     ///
     /// However, that is super confusing and not really that meaningful for accuracy.
-    /// We also cannot use radians since the intent is to avoid fractional math as much as possible.
+    /// Good news however, the implementation is just a wrapping constructor, and the type otherwise
+    /// behaves like a normal unsigned integer.
     ///
     /// This is a similar implementation to the original game but it extends the range to the
     /// more common degree range.
     class [[clang::trivial_abi]] angle final { // NOLINT(readability-identifier-naming)
-        u16 raw;
+        u16 raw { 0 };
 
       public:
+        constexpr angle() noexcept {};
+
+        /// Construction of angles is explicit as otherwise math would be pretty easy to mess up otherwise.
+        constexpr explicit angle(u16 raw) noexcept : raw(raw % 360) {}
+
         [[clang::always_inline]]
-        constexpr operator u32() const {
+        constexpr operator u32() const noexcept {
             return raw;
+        }
+
+        constexpr auto operator+(angle other) const noexcept -> angle {
+            return angle(raw + other.raw);
+        }
+
+        constexpr auto operator-(angle other) const noexcept -> angle {
+            return angle(raw - other.raw);
+        }
+
+        constexpr void operator+=(angle other) noexcept {
+            *this = angle(raw + other.raw);
+        }
+
+        constexpr void operator-=(angle other) noexcept {
+            *this = angle(raw - other.raw);
         }
     };
 

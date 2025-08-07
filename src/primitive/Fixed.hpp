@@ -37,6 +37,8 @@ namespace trash {
     /// I do not, they are long unsupported. Using C++17 in any new code is genuinely stupid.
     /// These "versions" are just toggling some features, one can compile code for a project
     /// combining language modes, it's the same compiler ffs. What a waste of my time.
+    ///
+    /// I suppose GCC also exists but I don't like GCC. I dislike MSVC even more but I have to support it sadly.
     constexpr auto is_constant_evaluated() noexcept -> bool {
         return __builtin_is_constant_evaluated();
     }
@@ -86,19 +88,19 @@ class [[clang::trivial_abi]] fixed final { // NOLINT(readability-identifier-nami
     }
 
     [[clang::always_inline]]
-    constexpr operator i32() const noexcept {
+    constexpr explicit operator i32() const noexcept {
         // Casting to a signed type will perform an arithmetic shift instead and preserve the sign
         return i32(raw) >> 8;
     }
 
     [[clang::always_inline]]
-    static constexpr fixed from_raw(u32 value) noexcept {
-        return fixed(value);
+    static constexpr fixed from_raw(i32 value) noexcept {
+        return fixed((u32) value);
     }
 
     [[clang::always_inline]]
-    static constexpr auto into_raw(fixed value) noexcept -> u32 {
-        return value.raw;
+    static constexpr auto into_raw(fixed value) noexcept -> i32 {
+        return i32(value.raw);
     }
 };
 
@@ -115,7 +117,7 @@ constexpr auto operator==(fixed lhs, fixed rhs) noexcept -> bool {
 
 [[clang::always_inline]]
 constexpr auto operator!=(fixed lhs, fixed rhs) noexcept -> bool {
-    return fixed::into_raw(lhs) == fixed::into_raw(rhs);
+    return fixed::into_raw(lhs) != fixed::into_raw(rhs);
 }
 
 [[clang::always_inline]]
@@ -158,18 +160,15 @@ constexpr auto operator-(fixed self) noexcept -> fixed {
 
 [[clang::always_inline]]
 constexpr auto operator*(fixed lhs, fixed rhs) noexcept -> fixed {
-    u32 a = fixed::into_raw(lhs);
-    u32 b = fixed::into_raw(rhs);
-    u64 result = u64(a) * b; // 64-bit to avoid overflow
-    return fixed::from_raw(u32(result >> 8));
+    i64 result = i64(fixed::into_raw(lhs)) * fixed::into_raw(rhs);
+    return fixed::from_raw(i32(result >> 8));
 }
 
 [[clang::always_inline]]
 constexpr auto operator/(fixed lhs, fixed rhs) noexcept -> fixed {
-    u32 a = fixed::into_raw(lhs);
-    u32 b = fixed::into_raw(rhs);
-    u64 numerator = u64(a) << 8;
-    return fixed::from_raw(u32(numerator / b));
+    i64 numerator = i64(fixed::into_raw(lhs)) << 8;
+    i32 denominator = fixed::into_raw(rhs);
+    return fixed::from_raw(i32(numerator / denominator));
 }
 
 [[clang::always_inline]]
@@ -190,4 +189,40 @@ constexpr void operator*=(fixed& lhs, fixed rhs) noexcept {
 [[clang::always_inline]]
 constexpr void operator/=(fixed& lhs, fixed rhs) noexcept {
     lhs = lhs / rhs;
+}
+
+namespace math {
+    [[clang::always_inline]]
+    constexpr auto trunc(fixed value) noexcept -> fixed {
+        return fixed((i32) value);
+    }
+
+    [[clang::always_inline]]
+    constexpr auto abs(fixed value) noexcept -> fixed {
+        i32 signed_raw = fixed::into_raw(value);
+        i32 abs_raw = signed_raw < 0 ? -signed_raw : signed_raw;
+        return fixed::from_raw(abs_raw);
+    }
+
+    [[clang::always_inline]]
+    constexpr auto sign(fixed value) noexcept -> fixed {
+        if (value == 0) {
+            return 0;
+        } else if (value > 0) {
+            return 1;
+        } else {
+            return -1;
+        }
+    }
+
+    [[clang::always_inline]]
+    constexpr auto floor(fixed value) noexcept -> fixed {
+        const i32 raw = fixed::into_raw(value);
+        const bool is_negative = raw < 0;
+        const bool has_fraction = (raw & 0xFF) != 0;
+
+        // If negative and has a fraction, subtract 1 from the integer part
+        const i32 floored = (raw >> 8) - (is_negative && has_fraction ? 1 : 0);
+        return floored;
+    }
 }

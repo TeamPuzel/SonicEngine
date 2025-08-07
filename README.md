@@ -31,8 +31,9 @@ The project can be built on any platform using CMake or Visual Studio. The depen
 The controls can be operated in left handed and right handed modes:
 - Move with arrow keys and jump with X
 - Move with WASD keys and jump with ENTER
-
-Press down to crouch when standing still or roll up when moving.
+- Hold down to crouch when standing still or roll up when moving.
+- Hold down and the jump button while still to charge up a spindash.
+- plus and minus keys adjust the integer scale the game is rendering at, the default is 4x.
 
 There were no other abilities in Sonic 1 yet.
 
