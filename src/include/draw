@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../draw/Color.hpp"
-#include "../draw/Drawable.hpp"
-#include "../draw/Image.hpp"
-#include "../draw/Text.hpp"
+#include "../draw/color.hpp"
+#include "../draw/drawable.hpp"
+#include "../draw/image.hpp"
+#include "../draw/text.hpp"

@@ -1,4 +1,4 @@
 #pragma once
 
-#include "../math/Angle.hpp"
-#include "../math/Point.hpp"
+#include "../math/angle.hpp"
+#include "../math/point.hpp"

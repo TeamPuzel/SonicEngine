@@ -151,8 +151,8 @@ const sonicFileFormat = {
                     writer.bool(0);
                     writer.bool(0);
                 } else {
-                    writer.i32(tile.tileId % 32);
-                    writer.i32(Math.floor(tile.tileId / 32));
+                    writer.i32(tile.tileId % 16);
+                    writer.i32(Math.floor(tile.tileId / 16));
                     writer.u16(angle.tileId);
                     writer.u8(solid.tileId + 1)
                     writer.bool(tile.flippedHorizontally);

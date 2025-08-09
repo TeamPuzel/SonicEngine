@@ -19,20 +19,16 @@ class SonicGame final {
         this->angle_sheet = draw::TgaImage::from(rt::load("res/angles.tga")) | draw::flatten<draw::Image>();
         this->background = draw::TgaImage::from(rt::load("res/background.tga")) | draw::flatten<draw::Image>();
 
-        this->scene = sonic::Stage::load(
-            "res/1-1.stage",
-            sonic::registry,
-            std::as_const(height_arrays) | draw::as_ref() | draw::as_slice()
-        );
+        this->scene = sonic::Stage::load("res/1-1.stage", sonic::registry, std::as_const(height_arrays) | draw::as_ref());
     }
 
     void update(rt::Input const& input) {
         scene->update(input);
     }
 
-    template <typename T> void draw(T& target) const {
+    template <typename T> void draw(rt::Input const& input, T& target) const {
         static_assert(draw::SizedDrawable<T>::value and draw::MutableDrawable<T>::value);
-        scene->draw(target, sheet, background);
+        scene->draw(input, target, sheet, background);
     }
 };
 

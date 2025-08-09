@@ -1,5 +1,5 @@
 #pragma once
 
-#include "../sonic/Scene.hpp"
-#include "../sonic/Object.hpp"
-#include "../sonic/Stage.hpp"
+#include "../sonic/scene.hpp"
+#include "../sonic/object.hpp"
+#include "../sonic/stage.hpp"

@@ -1,5 +1,5 @@
 #pragma once
 
-#include "../rt/Game.hpp"
-#include "../rt/AudioContext.hpp"
-#include "../rt/File.hpp"
+#include "../rt/game.hpp"
+#include "../rt/audio.hpp"
+#include "../rt/file.hpp"

@@ -12,12 +12,12 @@ Why this game:
 
 The minimum I will definitely make:
 - The first and most iconic Sonic level, Act 1 of Green Hill Zone from the first game.
-- Port code to compile in C++17 mode.
+- Make sure the code can compile in C++17 mode.
 - Ensure it compiles with broken compilers like MSVC which can *crash* while parsing labels. Pathetic. It also runs out of memory
-without horrible hacks. I would never rely on such low quality and proprietary software in a serious project.
+without horrible hacks. I would never rely on such low quality and proprietary software in a serious project :)
 
 If I have the time I will also make:
-- Act 2 and 3 since they share most of their assets with the first stage.
+- Act 2 and 3 since they share most of their assets with the first stage. (Spoke too soon, the physics were hard to implement)
 
 ## Getting started
 
@@ -33,7 +33,9 @@ The controls can be operated in left handed and right handed modes:
 - Move with WASD keys and jump with ENTER
 - Hold down to crouch when standing still or roll up when moving.
 - Hold down and the jump button while still to charge up a spindash.
-- plus and minus keys adjust the integer scale the game is rendering at, the default is 4x.
+- + and - keys adjust the integer scale the game is rendering at, the default is 4x.
+- (Debug) Press 1 to toggle the visual debug overlay visualizing collision and more.
+- (Debug) Press 2 to override physics and freely fly around.
 
 There were no other abilities in Sonic 1 yet.
 
