@@ -5,21 +5,24 @@
 #include <rt>
 #include <sonic>
 
+using draw::Image;
+using draw::TgaImage;
+
 class SonicGame final {
-    draw::Image sheet;
-    draw::Image height_arrays;
-    draw::Image angle_sheet;
-    draw::Image background;
-    box<sonic::Scene> scene;
+    Image sheet;
+    Image height_arrays;
+    Image angle_sheet;
+    Image background;
+    Box<sonic::Scene> scene;
 
   public:
     SonicGame() {
-        this->sheet = draw::TgaImage::from(rt::load("res/tilemap.tga")) | draw::flatten<draw::Image>();
-        this->height_arrays = draw::TgaImage::from(rt::load("res/collision.tga")) | draw::flatten<draw::Image>();
-        this->angle_sheet = draw::TgaImage::from(rt::load("res/angles.tga")) | draw::flatten<draw::Image>();
-        this->background = draw::TgaImage::from(rt::load("res/background.tga")) | draw::flatten<draw::Image>();
+        this->sheet = TgaImage::from(rt::load("res/tilemap.tga")) | draw::flatten<Image>();
+        this->height_arrays = TgaImage::from(rt::load("res/collision.tga")) | draw::flatten<Image>();
+        this->angle_sheet = TgaImage::from(rt::load("res/angles.tga")) | draw::flatten<Image>();
+        this->background = TgaImage::from(rt::load("res/background.tga")) | draw::flatten<Image>();
 
-        this->scene = sonic::Stage::load("res/1-1.stage", sonic::registry, std::as_const(height_arrays) | draw::as_ref());
+        this->scene = sonic::Stage::load("res/1-1.stage", sonic::registry, height_arrays);
     }
 
     void update(rt::Input const& input) {

@@ -14,18 +14,10 @@
 
 namespace sonic {
     struct DrawCommand {
-        enum class Type : u8 {
-            Tile,
-            Object,
-        } type;
+        enum class Type : u8 { Tile, Object } type;
 
-        struct Tile final {
-            i32 x, y;
-        };
-
-        struct Object final {
-            std::reference_wrapper<const sonic::Object> ref;
-        };
+        struct Tile final { i32 x, y; };
+        struct Object final { std::reference_wrapper<const sonic::Object> ref; };
 
         union {
             Tile tile;
@@ -56,31 +48,39 @@ namespace sonic {
 
     struct SolidTile final {
         i32 x, y;
-        u16 angle;
+        angle angle;
         Solidity solidity;
+        bool flag;
         bool mirror_x;
         bool mirror_y;
 
         static auto read(rt::BinaryReader& reader) -> SolidTile {
+            const auto x = reader.i32();
+            const auto y = reader.i32();
+            const auto raw_angle = reader.u16();
+            const auto solidity = (Solidity) reader.u8();
+            const auto mirror_x = reader.boolean();
+            const auto mirror_y = reader.boolean();
+
             return SolidTile {
-                reader.i32(),
-                reader.i32(),
-                reader.u16(),
-                (Solidity) reader.u8(),
-                reader.boolean(),
-                reader.boolean(),
+                x, y,
+                math::angle(raw_angle),
+                solidity,
+                raw_angle == 360,
+                mirror_x,
+                mirror_y
             };
         }
     };
 
     /// A coroutine class representing the state of a loaded stage.
     class Stage final : public Scene {
-        draw::Ref<const draw::Image> height_tiles;
+        Ref<const Image> height_tiles;
         u32 width { 0 };
         u32 height { 0 };
         std::vector<Tile> foreground;
         std::vector<SolidTile> collision;
-        std::vector<box<Object>> objects;
+        std::vector<Box<Object>> objects;
         Object* primary;
         usize tick;
 
@@ -96,13 +96,13 @@ namespace sonic {
             return collision.at(y + x * height);
         }
 
-        Stage(draw::Ref<const draw::Image> height_tiles) : height_tiles(height_tiles) {}
+        Stage(Ref<const Image> height_tiles) : height_tiles(height_tiles) {}
 
         void update(rt::Input const& input) override {
             if (input.key_pressed(rt::Key::Num1)) visual_debug = !visual_debug;
             if (input.key_pressed(rt::Key::Num2)) movement_debug = !movement_debug;
 
-            for (box<Object>& object : objects) {
+            for (Box<Object>& object : objects) {
                 object->update(input, *this);
             }
 
@@ -112,10 +112,7 @@ namespace sonic {
         /// We receive three things, an inout mutable image representing the screen to render into,
         /// another image which is the sprite sheet and one to slice the background from.
         void draw(
-            rt::Input const& input,
-            draw::Ref<draw::Image> target,
-            draw::Ref<const draw::Image> sheet,
-            draw::Ref<const draw::Image> background
+            rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
         ) const override {
             // We will first assemble a buffer of draw commands, this way we can easily sort before rendering later.
             std::vector<DrawCommand> commands;
@@ -162,7 +159,7 @@ namespace sonic {
 
             // Schedule objects for rendering as well.
             // TODO: Avoid scheduling off-screen objects.
-            for (box<Object> const& object : objects) {
+            for (Box<Object> const& object : objects) {
                 auto command = DrawCommand { DrawCommand::Type::Object };
                 command.object.ref = *object;
                 commands.push_back(command);
@@ -172,7 +169,7 @@ namespace sonic {
 
             // First clear the entire screen with the water color, just in case the display is taller than the parallax bg.
             // This is hardcoded for 1-1 at the moment.
-            target | draw::clear(draw::Color::rgba(0, 144, 252));
+            target | draw::clear(Color::rgba(0, 144, 252));
 
             // The background will be drawn by:
             // - Slicing out the parallax strips from the background in a repeating fashion.
@@ -198,23 +195,23 @@ namespace sonic {
             // Everything is just made of composable building blocks which can describe anything through intuitive expressions.
             {
                 // Rotate through these colors for the waterfalls and shimmer.
-                const draw::Color shimmer_colors[4] = {
-                    draw::Color::rgba(108, 144, 180),
-                    draw::Color::rgba(108, 144, 252),
-                    draw::Color::rgba(144, 180, 252),
-                    draw::Color::rgba(180, 216, 252),
+                const Color shimmer_colors[4] = {
+                    Color::rgba(108, 144, 180),
+                    Color::rgba(108, 144, 252),
+                    Color::rgba(144, 180, 252),
+                    Color::rgba(180, 216, 252),
                 };
 
-                const auto shimmer_effect = [this, shimmer_colors] (draw::Color color, i32 x, i32 y) -> draw::Color {
+                const auto shimmer_effect = [this, shimmer_colors] (Color color, i32 x, i32 y) -> Color {
                     const i32 shift = i32(tick / 4) % 4;
 
-                    if (color == draw::Color::rgba(119, 17, 119)) {
+                    if (color == Color::rgba(119, 17, 119)) {
                         return shimmer_colors[(3 + shift) % 4];
-                    } else if (color == draw::Color::rgba(153, 51, 153)) {
+                    } else if (color == Color::rgba(153, 51, 153)) {
                         return shimmer_colors[(2 + shift) % 4];
-                    } else if (color == draw::Color::rgba(187, 85, 187)) {
+                    } else if (color == Color::rgba(187, 85, 187)) {
                         return shimmer_colors[(1 + shift) % 4];
-                    } else if (color == draw::Color::rgba(221, 119, 221)) {
+                    } else if (color == Color::rgba(221, 119, 221)) {
                         return shimmer_colors[(0 + shift) % 4];
                     } else {
                         return color;
@@ -261,7 +258,7 @@ namespace sonic {
                 if (command.type == DrawCommand::Type::Object) {
                     Object const& object = command.object.ref.get();
                     const auto [posx, posy] = object.pixel_pos();
-                    const auto [x, y, w, h, mirror_x, mirror_y, rotate] = object.sprite(input);
+                    const auto [x, y, w, h, mirror_x, mirror_y, rotation] = object.sprite(input);
                     const auto ofx = -w / 2;
                     const auto ofy = -h / 2;
 
@@ -270,7 +267,8 @@ namespace sonic {
                     camera_target | draw::draw(
                         tilemap.tile(x, y)
                             | draw::apply_if(mirror_x, draw::mirror_x())
-                            | draw::apply_if(mirror_y, draw::mirror_y()),
+                            | draw::apply_if(mirror_y, draw::mirror_y())
+                            | draw::rotate(i32(rotation)),
                         posx + ofx,
                         posy + ofy
                     );
@@ -288,8 +286,8 @@ namespace sonic {
 
                         camera_target | draw::draw(
                             tilemap.tile(tile.x, tile.y)
-                                | draw::map([] (auto color, i32 x, i32 y) {
-                                    return color == draw::color::WHITE ? color.with_a(128) : color;
+                                | draw::map([] (Color color, i32 x, i32 y) -> Color {
+                                    return color.with_a(128); // Intentionally increase transparency level too to darken everything.
                                 })
                                 | draw::apply_if(tile.mirror_x, draw::mirror_x())
                                 | draw::apply_if(tile.mirror_y, draw::mirror_y()),
@@ -307,10 +305,7 @@ namespace sonic {
 
         enum class SensorDirection : u8 { Down, Right, Up, Left };
 
-        struct SensorResult final {
-            i32 distance;
-            math::angle angle;
-        };
+        struct SensorResult final { i32 distance; math::angle angle; bool flag; };
 
         /// The sensor logic is implemented differently, given the significant CPU improvement since then
         /// the game can just dynamically figure out the height arrays from the reference images on the fly.
@@ -346,7 +341,7 @@ namespace sonic {
                 return 0;
             };
 
-            // Converts height to the local pixel index (0..15) inside that tile.
+            // Converts height to the local pixel offset (0..15) inside that tile.
             const auto localize = [direction] (i32 height) -> i32 {
                 return direction == SensorDirection::Down or direction == SensorDirection::Left
                     ? 16 - height
@@ -396,6 +391,7 @@ namespace sonic {
                 return {
                     distance_to_surface(tx, ty, localize(exact_height)),
                     math::angle(exact_tile.angle),
+                    exact_tile.flag,
                 };
             } else if (exact_height == 0) {
                 auto [extended_tile, etx, ety] = extend();
@@ -404,16 +400,19 @@ namespace sonic {
                     | draw::apply_if(extended_tile.mirror_y, draw::mirror_y());
                 const i32 extended_height = height_of(extended);
 
-                if (extended_height == 0) { // No surface found in two tiles -> distance to far edge of the second tile checked.
+                // We extend if the current tile is empty, this one is intuitive.
+                if (extended_height == 0) {
                     i32 edge_local = (direction == SensorDirection::Down or direction == SensorDirection::Right) ? 15 : 0;
                     return {
                         distance_to_surface(etx, ety, edge_local),
                         math::angle(extended_tile.angle),
+                        extended_tile.flag,
                     };
                 } else {
                     return {
                         distance_to_surface(etx, ety, localize(extended_height)),
                         math::angle(extended_tile.angle),
+                        extended_tile.flag,
                     };
                 }
             } else {
@@ -423,15 +422,21 @@ namespace sonic {
                     | draw::apply_if(regressed_tile.mirror_y, draw::mirror_y());
                 const i32 regressed_height = height_of(regressed);
 
-                if (regressed_height == 0) { // Per spec: if regression tile empty, default to processing the exact tile.
+                // Regression is a bit less intuitive so here's an explanation.
+                // We regress in case we are unsure if the tile is the actual edge
+                // or if terrain extends another tile still.
+                // If we find that it was already the actual edge then we ignore the regression.
+                if (regressed_height == 0) {
                     return {
                         distance_to_surface(tx, ty, localize(exact_height)),
                         math::angle(exact_tile.angle),
+                        exact_tile.flag,
                     };
                 } else {
                     return {
                         distance_to_surface(rtx, rty, localize(regressed_height)),
-                        math::angle(regressed_tile.angle)
+                        math::angle(regressed_tile.angle),
+                        regressed_tile.flag,
                     };
                 }
             }
@@ -443,31 +448,70 @@ namespace sonic {
             return sense(x + ox, y + oy, direction);
         }
 
+        [[clang::always_inline]]
+        static auto rotate(SensorDirection direction, u32 by_steps) noexcept -> SensorDirection {
+            return (SensorDirection) (((u32) direction + by_steps) % 4);
+        }
+
+        [[clang::always_inline]]
+        static auto rotate(i32 x, i32 y, i32 steps) noexcept -> std::pair<i32, i32> {
+            steps = ((steps % 4) + 4) % 4;
+
+            switch (steps) {
+                case 0: return { +x, +y };
+                case 1: return { -y, +x };
+                case 2: return { -x, -y };
+                case 3: return { +y, -x };
+            }
+
+            intr::unreachable();
+        }
+
+        [[clang::always_inline]]
+        auto sense(Sonic const* relative_space, i32 x, i32 y, SensorDirection direction, Sonic::Mode mode) const -> SensorResult {
+            const auto [rx, ry] = rotate(x, y, (i32) mode);
+            return sense(relative_space, rx, ry, rotate(direction, (u32) mode));
+        }
+
         /// Visualises a sensor within a target.
-        /// The target's origin should align with the relative space origin and it need not have size.
+        /// The target's origin should align with the relative space origin and need not have size.
         template <typename T> [[clang::always_inline]]
-        auto sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, T target) const {
+        void sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, T target, Color color) const {
             static_assert(draw::MutableDrawable<T>::value);
             const auto res = sense(relative_space, x, y, direction);
 
             switch (direction) {
-                case SensorDirection::Down:  target | draw::line(x, y, x, y + res.distance, draw::color::pico::RED); break;
-                case SensorDirection::Right: target | draw::line(x, y, x + res.distance, y, draw::color::pico::RED); break;
-                case SensorDirection::Up:    target | draw::line(x, y, x, y - res.distance, draw::color::pico::RED); break;
-                case SensorDirection::Left:  target | draw::line(x, y, x - res.distance, y, draw::color::pico::RED); break;
+                case SensorDirection::Down:  target | draw::line(x, y, x, y + res.distance, color); break;
+                case SensorDirection::Right: target | draw::line(x, y, x + res.distance, y, color); break;
+                case SensorDirection::Up:    target | draw::line(x, y, x, y - res.distance, color); break;
+                case SensorDirection::Left:  target | draw::line(x, y, x - res.distance, y, color); break;
+            }
+        }
+
+        template <typename T> [[clang::always_inline]]
+        void sense_draw(Sonic const* relative_space, i32 x, i32 y, SensorDirection direction, Sonic::Mode mode, T target, Color color) const {
+            static_assert(draw::MutableDrawable<T>::value);
+            const auto res = sense(relative_space, x, y, direction, mode);
+
+            auto rotated_target = target
+                | draw::rotate((u8) mode);
+
+            switch (rotate(direction, (u32) mode)) {
+                case SensorDirection::Down:  target | draw::line(x, y, x, y + res.distance, color); break;
+                case SensorDirection::Right: target | draw::line(x, y, x + res.distance, y, color); break;
+                case SensorDirection::Up:    target | draw::line(x, y, x, y - res.distance, color); break;
+                case SensorDirection::Left:  target | draw::line(x, y, x - res.distance, y, color); break;
             }
         }
 
         /// Loads a stage from a file using a provided object registry.
         /// Throws a runtime error if the registry doesn't recognize the object.
         template <typename Reg> static auto load(
-            char const* filename,
-            Reg const& registry,
-            draw::Ref<const draw::Image> height_arrays
-        ) -> box<Stage> {
+            char const* filename, Reg const& registry, Ref<const Image> height_arrays
+        ) -> Box<Stage> {
             static_assert(ObjectRegistry<Reg>::value);
 
-            auto ret = box<Stage>::make(height_arrays);
+            auto ret = Box<Stage>::make(height_arrays);
 
             const auto data = rt::load(filename);
             auto reader = rt::BinaryReader::of(data);

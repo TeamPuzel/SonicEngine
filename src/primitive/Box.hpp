@@ -6,30 +6,34 @@
 #pragma once
 #include <utility>
 
-template <typename T> class box final { // NOLINT(readability-identifier-naming)
+template <typename T> class Box final { // NOLINT(readability-identifier-naming)
     T* inner;
 
-    explicit box(T* inner) noexcept : inner(inner) {}
+    explicit Box(T* inner) noexcept : inner(inner) {}
 
   public:
-    box() noexcept : inner(nullptr) {}
+    Box() noexcept : inner(nullptr) {}
 
-    template <typename U> friend class box;
+    template <typename U> friend class Box;
 
-    template <typename... Args> static auto make(Args&&...args) -> box {
-        return box(new T(std::forward<Args>(args)...));
+    template <typename... Args> static auto make(Args&&...args) -> Box {
+        return Box(new T(std::forward<Args>(args)...));
     }
 
-    box(box const&) = delete;
-    auto operator=(box const&) -> box& = delete;
+    static auto dangling() noexcept -> Box {
+        return Box(0x1);
+    }
+
+    Box(Box const&) = delete;
+    auto operator=(Box const&) -> Box& = delete;
 
     template <typename U, std::enable_if_t<std::is_convertible_v<U*, T*>, int> = 0>
-    box(box<U>&& existing) noexcept : inner(existing.inner) {
+    Box(Box<U>&& existing) noexcept : inner(existing.inner) {
         existing.inner = nullptr;
     }
 
     template <typename U, std::enable_if_t<std::is_convertible_v<U*, T*>, int> = 0>
-    auto operator=(box<U>&& existing) noexcept -> box& {
+    auto operator=(Box<U>&& existing) noexcept -> Box& {
         if ((void*)this != (void*)&existing) {
             delete this->inner;
             this->inner = existing.inner;
@@ -38,7 +42,7 @@ template <typename T> class box final { // NOLINT(readability-identifier-naming)
         return *this;
     }
 
-    ~box() noexcept {
+    ~Box() noexcept {
         delete this->inner; // Deleting a nullptr is sound.
     }
 

@@ -7,6 +7,12 @@
 #include <type_traits>
 
 namespace sonic {
+    using draw::Image;
+    using draw::Ref;
+    using draw::Color;
+    using math::point;
+    using math::angle;
+
     class Stage;
 
     /// A simple animation system which scrolls through and loops in a range.
@@ -94,12 +100,10 @@ namespace sonic {
     /// consistent dereferencing syntax. It inherits the "."/"->" nonsense from C.
     class Object {
       public:
-        math::point<fixed> position;
-        math::point<fixed> speed;
-        u16 width_radius;
-        u16 height_radius;
+        point<fixed> position;
+        point<fixed> speed;
         fixed ground_speed;
-        math::angle ground_angle;
+        angle ground_angle;
 
         /// Called each tick at 60hz.
         virtual void update(rt::Input const& input, Stage& stage) noexcept {}
@@ -107,7 +111,7 @@ namespace sonic {
         struct Sprite final {
             i32 x { 0 }, y { 0 }, w { 0 }, h { 0 };
             bool mirror_x { false }, mirror_y { false };
-            u8 rotate { 0 };
+            u8 rotation { 0 };
         };
 
         virtual auto sprite(rt::Input const&) const noexcept -> Sprite {
@@ -129,7 +133,7 @@ namespace sonic {
         }
 
         /// Called when debug drawing is enabled, meant to visualise collision etc.
-        virtual void debug_draw(draw::DrawableSlice<draw::Ref<draw::Image>>& target, Stage const& stage) const noexcept {}
+        virtual void debug_draw(draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept {}
     };
 
     /// A game object which can be serialized.
@@ -148,7 +152,7 @@ namespace sonic {
         std::is_same<decltype(Self::deserialize(std::declval<rt::BinaryReader&>())), Self>::value
     >> : std::true_type {};
 
-    using Deserializer = auto (rt::BinaryReader&) -> box<Object>;
+    using Deserializer = auto (rt::BinaryReader&) -> Box<Object>;
 
     /// A registry is a functor mapping object class names from the file format onto their deserializer.
     ///
@@ -166,6 +170,7 @@ namespace sonic {
 
     /// The player entity representing Sonic himself.
     class Sonic final : public Object {
+      public:
         enum class State : u8 {
             Normal,
             Rolling,
@@ -226,6 +231,11 @@ namespace sonic {
             return ground_sensor_mode(); // Let's just reuse these elsewhere.
         }
 
+        auto is_half_steep() const noexcept -> bool {
+            const auto angle = (u32) ground_angle % 90;
+            return angle > 45;
+        }
+
         [[clang::always_inline]] [[gnu::pure]]
         auto width_radius() const noexcept -> i32 {
             switch (state) {
@@ -244,22 +254,21 @@ namespace sonic {
             }
         }
 
-      public:
-        static constexpr fixed JUMP_FORCE = fixed(6, 128);
-        static constexpr fixed GRAVITY_FORCE = fixed(0, 56);
-        static constexpr fixed ACCELERATION_SPEED = fixed(0, 12);
-        static constexpr fixed DECELERATION_SPEED = fixed(0, 128);
-        static constexpr fixed FRICTION_SPEED = fixed(0, 12);
-        static constexpr fixed TOP_SPEED = fixed(6, 0);
-        static constexpr fixed ROLL_FRICTION_SPEED = fixed(0, 6);
-        static constexpr fixed ROLL_DECELERATION_SPEED = fixed(0, 32);
-        static constexpr fixed AIR_ACCELERATION_SPEED = fixed(0, 24);
-        static constexpr fixed SLOPE_FACTOR_NORMAL = fixed(0, 32);
-        static constexpr fixed SLOPE_FACTOR_ROLL_UP = fixed(0, 20);
-        static constexpr fixed SLOPE_FACTOR_ROLL_DOWN = fixed(0, 80);
-        static constexpr fixed HURT_X_FORCE = fixed(2);
-        static constexpr fixed HURT_Y_FORCE = fixed(4);
-        static constexpr fixed HURT_GRAVITY = fixed(0, 48);
+        static constexpr fixed JUMP_FORCE              = fixed(6, 128);
+        static constexpr fixed GRAVITY_FORCE           = fixed(0, 56 );
+        static constexpr fixed ACCELERATION_SPEED      = fixed(0, 12 );
+        static constexpr fixed DECELERATION_SPEED      = fixed(0, 128);
+        static constexpr fixed FRICTION_SPEED          = fixed(0, 12 );
+        static constexpr fixed TOP_SPEED               = fixed(6, 0  );
+        static constexpr fixed ROLL_FRICTION_SPEED     = fixed(0, 6  );
+        static constexpr fixed ROLL_DECELERATION_SPEED = fixed(0, 32 );
+        static constexpr fixed AIR_ACCELERATION_SPEED  = fixed(0, 24 );
+        static constexpr fixed SLOPE_FACTOR_NORMAL     = fixed(0, 32 );
+        static constexpr fixed SLOPE_FACTOR_ROLL_UP    = fixed(0, 20 );
+        static constexpr fixed SLOPE_FACTOR_ROLL_DOWN  = fixed(0, 80 );
+        static constexpr fixed HURT_X_FORCE            = fixed(2, 0  );
+        static constexpr fixed HURT_Y_FORCE            = fixed(4, 0  );
+        static constexpr fixed HURT_GRAVITY            = fixed(0, 48 );
 
         void update(rt::Input const& input, Stage& stage) noexcept override;
 
@@ -296,8 +305,15 @@ namespace sonic {
                         if (animator.play(Animation::Running, 4)) anim_x = 0, anim_y = 9;
                     }
 
-                    if (animator.is(Animation::Walking) or animator.is(Animation::Running))
+                    if (animator.is(Animation::Walking) or animator.is(Animation::Running)) {
                         animator.set_speed((i32) math::floor(std::max<fixed>(0, 8 - abs_speed)));
+
+                        // if (is_half_steep()) {
+                        //     anim_y = animator.is(Animation::Walking) ? 8 : 10;
+                        // } else {
+                        //     anim_y = animator.is(Animation::Walking) ? 7 : 9;
+                        // }
+                    }
 
                     animator.update();
                 } break;
@@ -320,13 +336,13 @@ namespace sonic {
                 } break;
             }
 
-            return Sprite { anim_x + (i32) animator.at(), anim_y, 64, 64, mirror_x, false, 0 };
+            return Sprite { anim_x + (i32) animator.at(), anim_y, 64, 64, mirror_x, false, (u8) ground_sensor_mode() };
         }
 
-        void debug_draw(draw::DrawableSlice<draw::Ref<draw::Image>>& target, Stage const& stage) const noexcept override;
+        void debug_draw(draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept override;
 
-        static auto deserialize(rt::BinaryReader& reader) -> box<Object> {
-            return box<Sonic>::make();
+        static auto deserialize(rt::BinaryReader& reader) -> Box<Object> {
+            return Box<Sonic>::make();
         }
     };
 
@@ -336,8 +352,8 @@ namespace sonic {
     /// Collectable rings.
     class Ring final : public Object {
       public:
-        static auto deserialize(rt::BinaryReader& reader) -> box<Object> {
-            return box<Ring>::make();
+        static auto deserialize(rt::BinaryReader& reader) -> Box<Object> {
+            return Box<Ring>::make();
         }
     };
 

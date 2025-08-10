@@ -5,12 +5,10 @@
 //
 // TODO(?): It would be nice to implement std::format for this type.
 //          Not sure if that's worth my time since I have to port this game back to C++17 anyway.
-// TODO(?): This type could be signed.
-// TODO(!): Operator overloads for mixing fixed types with integers.
 #pragma once
 #include "primitive.hpp"
 
-// Workarounds for the garbage version of C++ I have to use, C++17.
+// Workarounds for the awful version of C++ I have to use, C++17.
 namespace trash {
     #ifdef _MSC_VER
     /// MSVC does not have a convenient builtin but it has botched semantics.
@@ -59,8 +57,8 @@ namespace trash {
 /// The type relies on the static assertion of the core header, that signed primitives are two's complement
 /// and the compiler performs sign extension when lowering an arithmetic shift.
 ///
-/// Because C++17 is an archaic decade old version and can't do signed shifts in constexpr I use equally garbage compiler
-/// abuse to get around it. This language before C++20/23 is genuinely just pathetic garbage.
+/// Because C++17 is an archaic decade old version and can't do signed shifts in constexpr I use equally awful compiler
+/// abuse to get around it. This language before C++20/23/26 is genuinely sad.
 class [[clang::trivial_abi]] fixed final { // NOLINT(readability-identifier-naming)
     u32 raw;
 

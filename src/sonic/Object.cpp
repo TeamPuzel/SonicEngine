@@ -105,8 +105,8 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
             // Align the Player to surface of terrain or become airborne if none found.
             const auto ground_mode = ground_sensor_mode();
 
-            const auto sensor_a = stage.sense(this, -width_radius(), height_radius(), Stage::SensorDirection::Down);
-            const auto sensor_b = stage.sense(this,  width_radius(), height_radius(), Stage::SensorDirection::Down);
+            const auto sensor_a = stage.sense(this, -width_radius(), height_radius(), Stage::SensorDirection::Down, ground_mode);
+            const auto sensor_b = stage.sense(this,  width_radius(), height_radius(), Stage::SensorDirection::Down, ground_mode);
 
             const auto sensor = [sensor_a, sensor_b] {
                 if (sensor_b.distance < sensor_a.distance) {
@@ -118,6 +118,12 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
 
             if (sensor.distance > -14 and sensor.distance < 14) {
                 position.y += sensor.distance;
+
+                // if (not sensor.flag) {
+                    ground_angle = sensor.angle;
+                // } else {
+                    // ground_angle = angle(((ground_angle / 90) % 4) * 90);
+                // }
             }
 
             // Check for slipping/falling when Ground Speed is too low on walls/ceilings.
@@ -210,7 +216,7 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
     }
 }
 
-void Sonic::debug_draw(draw::DrawableSlice<draw::Ref<draw::Image>>& target, Stage const& stage) const noexcept {
+void Sonic::debug_draw(draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept {
     auto [ppx, ppy] = pixel_pos();
 
     auto aligned_target = target
@@ -218,8 +224,9 @@ void Sonic::debug_draw(draw::DrawableSlice<draw::Ref<draw::Image>>& target, Stag
 
     switch (state) {
         case State::Normal: {
-            stage.sense_draw(this, -width_radius(), height_radius(), Stage::SensorDirection::Down, aligned_target);
-            stage.sense_draw(this,  width_radius(), height_radius(), Stage::SensorDirection::Down, aligned_target);
+            const auto ground_mode = ground_sensor_mode();
+            stage.sense_draw(this, -width_radius(), height_radius(), Stage::SensorDirection::Down, ground_mode, aligned_target, draw::color::pico::LIME);
+            stage.sense_draw(this,  width_radius(), height_radius(), Stage::SensorDirection::Down, ground_mode, aligned_target, draw::color::pico::GREEN);
         } break;
         case State::Rolling: {
 

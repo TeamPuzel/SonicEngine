@@ -372,6 +372,9 @@ namespace rt {
             };
         }
         SDL_SetWindowMinimumSize(window, width, height);
+        SDL_HideCursor();
+        SDL_SetWindowFullscreen(window, true);
+        SDL_SyncWindow(window);
 
         // A simple SDL provided renderer.
         //

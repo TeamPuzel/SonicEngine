@@ -9,6 +9,10 @@
 #include <rt>
 
 namespace sonic {
+    using draw::Image;
+    using draw::Ref;
+    using draw::Color;
+
     /// A scene coroutine which can be run.
     ///
     /// Rendering is performed into an image rather than a dynamic target since this is
@@ -18,10 +22,7 @@ namespace sonic {
         virtual void update(rt::Input const& input) = 0;
         /// Called after update to mutate the render target.
         virtual void draw(
-            rt::Input const& input,
-            draw::Ref<draw::Image> target,
-            draw::Ref<const draw::Image> sheet,
-            draw::Ref<const draw::Image> background
+            rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
         ) const = 0;
         virtual ~Scene() noexcept {}
     };

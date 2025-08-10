@@ -90,27 +90,6 @@ namespace draw {
     >> : std::true_type {};
 }
 
-namespace draw::dyn {
-    /// Dynamically dispatched drawable supertype.
-    struct Drawable {
-        virtual auto get(i32 x, i32 y) const noexcept -> Color = 0;
-    };
-
-    /// Dynamically dispatched mutable drawable supertype.
-    struct MutableDrawable : Drawable {
-        virtual void set(i32 x, i32 y, Color color) noexcept = 0;
-    };
-
-    /// Dynamically dispatched sized drawable supertype.
-    struct SizedDrawable : Drawable {
-        virtual auto width() const noexcept -> i32 = 0;
-        virtual auto height() const noexcept -> i32 = 0;
-    };
-
-    /// Dynamically dispatched sized mutable drawable supertype.
-    struct SizedMutableDrawable : SizedDrawable, MutableDrawable {};
-}
-
 /// Performs forwarding adapter composition. Based on the design of std::ranges.
 template <typename Self, typename Adapt> [[clang::always_inline]]
 constexpr auto operator|(Self&& self, Adapt&& adapt) noexcept(noexcept(std::forward<Adapt>(adapt)(std::forward<Self>(self))))
@@ -308,14 +287,14 @@ namespace draw {
         }
     };
 
-    template <typename T> class DrawableSlice final {
+    template <typename T> class Slice final {
         static_assert(Drawable<T>::value);
 
         T inner;
         i32 x, y, w, h;
 
       public:
-        constexpr explicit DrawableSlice(T inner, i32 x, i32 y, i32 width, i32 height) noexcept
+        constexpr explicit Slice(T inner, i32 x, i32 y, i32 width, i32 height) noexcept
             : inner(inner), x(x), y(y), w(width), h(height) {}
 
         constexpr auto get(i32 x, i32 y) const noexcept(noexcept(inner.get(this->x + x, this->y + y))) -> Color {
@@ -334,46 +313,46 @@ namespace draw {
             return h;
         }
 
-        constexpr auto resize_left(i32 offset) const noexcept -> DrawableSlice {
-            return DrawableSlice { inner, x - offset, y, std::max(0, w + offset), h };
+        constexpr auto resize_left(i32 offset) const noexcept -> Slice {
+            return Slice { inner, x - offset, y, std::max(0, w + offset), h };
         }
 
-        constexpr auto resize_right(i32 offset) const noexcept -> DrawableSlice {
-            return DrawableSlice { inner, x, y, std::max(0, w + offset), h };
+        constexpr auto resize_right(i32 offset) const noexcept -> Slice {
+            return Slice { inner, x, y, std::max(0, w + offset), h };
         }
 
-        constexpr auto resize_top(i32 offset) const noexcept -> DrawableSlice {
-            return DrawableSlice { inner, x, y - offset, w, std::max(0, h + offset) };
+        constexpr auto resize_top(i32 offset) const noexcept -> Slice {
+            return Slice { inner, x, y - offset, w, std::max(0, h + offset) };
         }
 
-        constexpr auto resize_bottom(i32 offset) const noexcept -> DrawableSlice {
-            return DrawableSlice { inner, x, y, w, std::max(0, h + offset) };
+        constexpr auto resize_bottom(i32 offset) const noexcept -> Slice {
+            return Slice { inner, x, y, w, std::max(0, h + offset) };
         }
 
-        constexpr auto resize_horizontal(i32 offset) const noexcept -> DrawableSlice {
-            return DrawableSlice { inner, x - offset, y, std::max(0, w + offset * 2), h };
+        constexpr auto resize_horizontal(i32 offset) const noexcept -> Slice {
+            return Slice { inner, x - offset, y, std::max(0, w + offset * 2), h };
         }
 
-        constexpr auto resize_vertical(i32 offset) const noexcept -> DrawableSlice {
-            return DrawableSlice { inner, x, y - offset, w, std::max(0, h + offset * 2) };
+        constexpr auto resize_vertical(i32 offset) const noexcept -> Slice {
+            return Slice { inner, x, y - offset, w, std::max(0, h + offset * 2) };
         }
 
-        constexpr auto shift(i32 off_x, i32 off_y) const noexcept -> DrawableSlice {
-            return DrawableSlice { inner, x + off_x, y + off_y, w, h };
+        constexpr auto shift(i32 off_x, i32 off_y) const noexcept -> Slice {
+            return Slice { inner, x + off_x, y + off_y, w, h };
         }
     };
 
-    template <typename T> struct DrawableGrid final {
+    template <typename T> struct Grid final {
         static_assert(Drawable<T>::value);
 
         T inner;
         i32 item_width, item_height;
       public:
-        constexpr explicit DrawableGrid(T& inner, i32 item_width, i32 item_height) noexcept
+        constexpr explicit Grid(T& inner, i32 item_width, i32 item_height) noexcept
             : inner(inner), item_width(item_width), item_height(item_height) {}
 
-        constexpr auto tile(i32 x, i32 y) noexcept -> DrawableSlice<T> {
-            return DrawableSlice(inner, x * item_width, y * item_height, item_width, item_height);
+        constexpr auto tile(i32 x, i32 y) const noexcept -> Slice<T> {
+            return Slice(inner, x * item_width, y * item_height, item_width, item_height);
         }
     };
 
@@ -381,34 +360,34 @@ namespace draw {
         struct Slice final {
             i32 x, y, width, height;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> DrawableSlice<T> {
+            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
                 static_assert(Drawable<T>::value);
-                return DrawableSlice<T>(inner, x, y, width, height);
+                return draw::Slice<T>(inner, x, y, width, height);
             }
         };
 
         struct Grid final {
             i32 item_width, item_height;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> DrawableGrid<T> {
+            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Grid<T> {
                 static_assert(Drawable<T>::value);
-                return DrawableGrid<T>(inner, item_width, item_height);
+                return draw::Grid<T>(inner, item_width, item_height);
             }
         };
 
         struct Shift final {
             i32 x, y;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> DrawableSlice<T> {
+            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
                 static_assert(SizedDrawable<T>::value);
-                return DrawableSlice<T>(inner, x, y, inner.width(), inner.height());
+                return draw::Slice<T>(inner, x, y, inner.width(), inner.height());
             }
         };
 
         struct AsSlice final {
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> DrawableSlice<T> {
+            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
                 static_assert(SizedDrawable<T>::value);
-                return DrawableSlice<T>(inner, 0, 0, inner.width(), inner.height());
+                return draw::Slice<T>(inner, 0, 0, inner.width(), inner.height());
             }
         };
 
@@ -423,22 +402,29 @@ namespace draw {
         };
     }
 
+    /// Slices an area from a drawable.
     constexpr adapt::Slice slice(i32 x, i32 y, i32 width, i32 height) noexcept {
         return adapt::Slice { x, y, width, height };
     }
 
+    /// Creates a grid which slices out tiles of provided size.
     constexpr adapt::Grid grid(i32 item_width, i32 item_height) noexcept {
         return adapt::Grid { item_width, item_height };
     }
 
+    /// Similar to the slice shift but wraps the type in a slice first.
     constexpr adapt::Shift shift(i32 x, i32 y) noexcept {
         return adapt::Shift { x, y };
     }
 
+    /// Wraps a sized drawable in a slice of matching proportions.
+    /// Convenient for accessing slice operations from a neutral area.
     constexpr adapt::AsSlice as_slice() noexcept {
         return adapt::AsSlice {};
     }
 
+    /// Explicitly wraps a drawable in a reference wrapper.
+    /// This is usually done through the implicit conversion but can still be useful in a chained expression.
     constexpr adapt::AsRef as_ref() noexcept {
         return adapt::AsRef {};
     }
@@ -512,10 +498,14 @@ namespace draw {
         };
     }
 
+    /// Performs a custom mapping with a provided functor. Can often be used instead of making entirely new drawables.
+    /// Receives the color and position, so the signature is `(Color c, i32 x, i32 y) -> Color`
     template <typename F> constexpr adapt::Map<F> map(F fn) noexcept {
         return adapt::Map<F> { fn };
     }
 
+    /// Performs a mapping of just the coordinate space.
+    /// Receives the position, so the signature is `(i32 x, i32 y) -> (i32 x, i32 y)`
     template <typename F> constexpr adapt::MapPos<F> map_pos(F fn) noexcept {
         return adapt::MapPos<F> { fn };
     }
@@ -528,11 +518,6 @@ namespace draw {
 
         T inner;
 
-      private:
-        static constexpr auto arithmetic_mod(i32 a, i32 b) noexcept -> i32 {
-            return (a % b + b) % b;
-        }
-
       public:
         constexpr auto width() const noexcept(noexcept(inner.width())) -> i32 {
             return inner.width();
@@ -543,20 +528,20 @@ namespace draw {
         }
 
         constexpr auto get(i32 x, i32 y) const
-            noexcept(noexcept(inner.get(arithmetic_mod(x, width()), arithmetic_mod(y, height())))) -> Color
+            noexcept(noexcept(inner.get(math::arithmetic_mod(x, width()), math::arithmetic_mod(y, height())))) -> Color
         {
             return inner.get(
-                arithmetic_mod(x, width()),
-                arithmetic_mod(y, height())
+                math::arithmetic_mod(x, width()),
+                math::arithmetic_mod(y, height())
             );
         }
 
         constexpr void set(i32 x, i32 y, Color color)
-            noexcept(noexcept(inner.set(arithmetic_mod(x, width()), arithmetic_mod(y, height()), color)))
+            noexcept(noexcept(inner.set(math::arithmetic_mod(x, width()), math::arithmetic_mod(y, height()), color)))
         {
             return inner.set(
-                arithmetic_mod(x, width()),
-                arithmetic_mod(y, height()),
+                math::arithmetic_mod(x, width()),
+                math::arithmetic_mod(y, height()),
                 color
             );
         }
@@ -570,6 +555,7 @@ namespace draw {
         };
     }
 
+    /// Tiles the drawable infinitely outside of its sized area.
     constexpr adapt::Repeat repeat() noexcept {
         return adapt::Repeat {};
     }
@@ -643,6 +629,7 @@ namespace draw {
         };
     }
 
+    /// Applies another adapter conditionally.
     template <typename F> constexpr adapt::ApplyIf<F> apply_if(bool cond, F fn) noexcept {
         return adapt::ApplyIf<F> { cond, fn };
     }
@@ -675,11 +662,117 @@ namespace draw {
             }
         }
 
-        constexpr auto set(i32 x, i32 y, Color color) const noexcept(noexcept(inner.set(width(), height(), color))) -> Color {
+        constexpr void set(i32 x, i32 y, Color color) const noexcept(noexcept(inner.set(width(), height(), color))) {
             if constexpr (AXIS == MirrorAxis::X) {
-                return inner.set(width() - 1 - x, y, color);
+                inner.set(width() - 1 - x, y, color);
             } else {
-                return inner.set(x, height() - 1 - y, color);
+                inner.set(x, height() - 1 - y, color);
+            }
+        }
+    };
+
+    template <typename T> struct RotatedDrawable final {
+        static_assert(SizedDrawable<T>::value);
+
+        T inner;
+        i32 rotation_step;
+
+        constexpr RotatedDrawable(T inner, i32 rotation_step) noexcept : inner(inner), rotation_step(rotation_step) {}
+
+      private:
+        constexpr auto normalized_step() const noexcept -> i32 {
+            return math::arithmetic_mod(rotation_step, 4);
+        }
+
+      public:
+        constexpr auto width() const noexcept(noexcept(inner.width()) and noexcept(inner.height())) -> i32 {
+            switch (normalized_step()) {
+                case 0:
+                case 2:
+                    return inner.width();
+                case 1:
+                case 3:
+                    return inner.height();
+            }
+            intr::unreachable();
+        }
+
+        constexpr auto height() const noexcept(noexcept(inner.width()) and noexcept(inner.height())) -> i32 {
+            switch (normalized_step()) {
+                case 0:
+                case 2:
+                    return inner.height();
+                case 1:
+                case 3:
+                    return inner.width();
+            }
+            intr::unreachable();
+        }
+
+        constexpr auto get(i32 x, i32 y) const noexcept(noexcept(inner.get(inner.width(), inner.height()))) -> Color {
+            switch (normalized_step()) {
+                case 0: return inner.get(x, y);
+                case 1: return inner.get(inner.width() - 1 - y, x);
+                case 2: return inner.get(inner.width() - 1 - x, inner.height() - 1 - y);
+                case 3: return inner.get(y, inner.height() - 1 - x);
+            }
+            intr::unreachable();
+        }
+
+        constexpr void set(i32 x, i32 y, Color color) const noexcept(noexcept(inner.set(inner.width(), inner.height(), color))) {
+            switch (normalized_step()) {
+                case 0: return inner.set(x, y, color);
+                case 1: return inner.set(inner.width() - 1 - y, x, color);
+                case 2: return inner.set(inner.width() - 1 - x, inner.height() - 1 - y, color);
+                case 3: return inner.set(y, inner.height() - 1 - x, color);
+            }
+            intr::unreachable();
+        }
+    };
+
+    template <typename T> struct RotatedOriginDrawable final {
+        static_assert(Drawable<T>::value);
+
+        T inner;
+        i32 rotation_step;
+
+        constexpr explicit RotatedOriginDrawable(T inner, i32 rotation_step) noexcept
+            : inner(inner), rotation_step(rotation_step) {}
+
+      private:
+        static constexpr auto arithmetic_mod(i32 a, i32 b) noexcept -> i32 {
+            return (a % b + b) % b;
+        }
+
+        constexpr auto normalized_step() const noexcept -> i32 {
+            return arithmetic_mod(rotation_step, 4);
+        }
+
+      public:
+        constexpr auto width() const noexcept(noexcept(inner.width())) -> i32 {
+            return inner.width(); // rotation about origin does not affect size
+        }
+
+        constexpr auto height() const noexcept(noexcept(inner.height())) -> i32 {
+            return inner.height();
+        }
+
+        constexpr auto get(i32 x, i32 y) const noexcept -> Color {
+            switch (normalized_step()) {
+                case 0: return inner.get(x, y);
+                case 1: return inner.get(y, -x);
+                case 2: return inner.get(-x, -y);
+                case 3: return inner.get(-y, x);
+            }
+            intr::unreachable();
+        }
+
+        constexpr void set(i32 x, i32 y, Color color) const noexcept {
+            switch (normalized_step()) {
+                case 0: inner.set(x, y, color); break;
+                case 1: inner.set(y, -x, color); break;
+                case 2: inner.set(-x, -y, color); break;
+                case 3: inner.set(-y, x, color); break;
             }
         }
     };
@@ -691,13 +784,29 @@ namespace draw {
                 return MirroredDrawable<AXIS, T>(inner);
             }
         };
+
+        struct Rotate final {
+            i32 rotation_step;
+
+            template <typename T> constexpr auto operator()(T inner) const noexcept -> RotatedDrawable<T> {
+                static_assert(SizedDrawable<T>::value);
+                return RotatedDrawable<T>(inner, rotation_step);
+            }
+        };
     }
 
+    /// Mirrors the drawable in terms of its sized area on the x axis.
     constexpr adapt::Mirror<MirrorAxis::X> mirror_x() noexcept {
         return adapt::Mirror<MirrorAxis::X> {};
     }
 
+    /// Mirrors the drawable in terms of its sized area on the y axis.
     constexpr adapt::Mirror<MirrorAxis::Y> mirror_y() noexcept {
         return adapt::Mirror<MirrorAxis::Y> {};
+    }
+
+    /// Rotates the drawable in terms of its sized area clockwise, can accept negative values to rotate counter-clockwise.
+    constexpr adapt::Rotate rotate(i32 step) noexcept {
+        return adapt::Rotate { step };
     }
 }

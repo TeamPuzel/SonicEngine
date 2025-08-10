@@ -95,9 +95,26 @@ namespace draw {
         constexpr Color ORANGE      = Color::rgba(255, 163, 0  );
         constexpr Color YELLOW      = Color::rgba(255, 236, 39 );
         constexpr Color GREEN       = Color::rgba(0,   228, 54 );
-        constexpr Color BLUE        = Color::rgba(41,  173, 255);
+        constexpr Color LIGHT_BLUE  = Color::rgba(41,  173, 255);
         constexpr Color LAVENDER    = Color::rgba(131, 118, 156);
         constexpr Color PINK        = Color::rgba(255, 119, 168);
         constexpr Color PEACH       = Color::rgba(255, 204, 170);
+
+        constexpr Color BLUE         = Color::rgba(48,  93,  166);
+        constexpr Color TEAL         = Color::rgba(73,  162, 160);
+        constexpr Color VIOLET       = Color::rgba(111, 80,  147);
+        constexpr Color DARK_TEAL    = Color::rgba(32,  82,  88 );
+        constexpr Color DARK_BROWN   = Color::rgba(108, 51,  44 );
+        constexpr Color UMBER        = Color::rgba(69,  46,  56 );
+        constexpr Color GRAY         = Color::rgba(158, 137, 123);
+        constexpr Color LIGHT_PINK   = Color::rgba(243, 176, 196);
+        constexpr Color CRIMSON      = Color::rgba(179, 37,  77 );
+        constexpr Color DARK_ORANGE  = Color::rgba(219, 114, 44 );
+        constexpr Color LIME         = Color::rgba(165, 234, 95 );
+        constexpr Color DARK_LIME    = Color::rgba(79,  175, 92 );
+        constexpr Color SKY          = Color::rgba(133, 220, 243);
+        constexpr Color LIGHT_VIOLET = Color::rgba(183, 155, 218);
+        constexpr Color MAGENTA      = Color::rgba(208, 48,  167);
+        constexpr Color DARK_PEACH   = Color::rgba(239, 139, 116);
     }
 }

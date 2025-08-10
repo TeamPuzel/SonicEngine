@@ -18,7 +18,7 @@ namespace draw {
             Space,
         } type;
 
-        using Glyph = DrawableSlice<T>;
+        using Glyph = Slice<T>;
         struct Space final { i32 width; };
 
         union {

@@ -85,3 +85,22 @@ namespace endian {
         return value;
     }
 }
+
+namespace math {
+    template <typename T> constexpr auto arithmetic_mod(T a, T b) noexcept -> T {
+        static_assert(std::is_integral<T>::value and std::is_signed<T>::value);
+        return (a % b + b) % b;
+    }
+}
+
+namespace intr {
+    #ifdef _MSC_VER
+    [[noreturn]] inline void unreachable() {
+        __assume(0);
+    }
+    #else
+    [[noreturn]] [[clang::always_inline]] inline void unreachable() {
+        __builtin_unreachable();
+    }
+    #endif
+}
