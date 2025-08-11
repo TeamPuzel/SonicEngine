@@ -9,7 +9,7 @@
 #pragma once
 #include <primitive>
 #include <vector>
-#include "drawable.hpp"
+#include "plane.hpp"
 
 namespace draw {
     /// The simplest sized primitive, it makes for a general purpose read/write drawable.
@@ -85,7 +85,7 @@ namespace draw {
         }
 
         template <typename U> static auto flatten(U const& other) -> Image {
-            static_assert(SizedDrawable<U>::value);
+            static_assert(SizedPlane<U>::value);
             return Image(other.width(), other.height(), [&] (i32 x, i32 y) -> Color {
                 return other.get(x, y);
             });
@@ -93,7 +93,7 @@ namespace draw {
     };
 
     // Assert that our type properly satisfies the desired interface.
-    static_assert(MutableDrawable<Image>::value and SizedDrawable<Image>::value);
+    static_assert(MutablePlane<Image>::value and SizedPlane<Image>::value);
 
     class TgaImage final {
         std::vector<u8> data;
@@ -127,5 +127,5 @@ namespace draw {
     };
 
     // Assert that our type properly satisfies the desired interface.
-    static_assert(SizedDrawable<TgaImage>::value);
+    static_assert(SizedPlane<TgaImage>::value);
 }

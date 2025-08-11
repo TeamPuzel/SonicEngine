@@ -1,7 +1,7 @@
 // Created by Lua (TeamPuzel) on May 26th 2025.
 // Copyright (c) 2025 All rights reserved.
 //
-// Because C++ is a terrible language some object update implementations need to be moved here.
+// Because C++ is a sad language some object update implementations need to be moved here.
 // Since they are virtual it's of no consequence to the compiler's ability to optimize but it is still
 // very inconvenient. C++ has no redeeming qualities tbh.
 #include "object.hpp"
@@ -24,6 +24,8 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
 
     // This is a faithful implementation of classic 16 bit sonic physics based directly on the Sonic Physics Guide.
     // The comments come from the guide and provide a clear outline of what's going on.
+    //
+    // The physics have three distinct modes, you can be aligned to the ground, in the air or rolling.
     switch (state) {
         case State::Normal: { // "Normal" means any time the Player is not airborne or rolling.
             // Check for special animations that prevent control (such as balancing).
@@ -44,9 +46,7 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
             ground_speed -= slope_factor * math::sin(ground_angle);
 
             // Check for starting a jump.
-            if (input.key_pressed(Key::X)) {
-                speed.y -= JUMP_FORCE;
-            }
+            if (input.key_pressed(Key::X)) speed.y -= JUMP_FORCE;
 
             {
                 const auto left = input.key_held(Key::Left), right = input.key_held(Key::Right);
@@ -90,9 +90,6 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
                 state = State::Rolling;
             }
 
-            // Handle camera boundaries (keep the Player inside the view and kill them if they touch the kill plane).
-            // NOTE: This will just handle the kill plane, my implementation inherently handles the camera unlike the original.
-
             // Move the Player object
             // Calculate X Speed and Y Speed from Ground Speed and Ground Angle.
             // Updates X Position and Y Position based on X Speed and Y Speed.
@@ -108,22 +105,20 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
             const auto sensor_a = stage.sense(this, -width_radius(), height_radius(), Stage::SensorDirection::Down, ground_mode);
             const auto sensor_b = stage.sense(this,  width_radius(), height_radius(), Stage::SensorDirection::Down, ground_mode);
 
-            const auto sensor = [sensor_a, sensor_b] {
-                if (sensor_b.distance < sensor_a.distance) {
-                    return sensor_b;
-                } else {
-                    return sensor_a;
-                }
-            }();
+            const auto sensor = sensor_b.distance < sensor_a.distance
+                ? sensor_b
+                : sensor_a;
 
+            // Take care to align with the ground respecting the mode.
             if (sensor.distance > -14 and sensor.distance < 14) {
-                position.y += sensor.distance;
+                switch (ground_mode) {
+                    case Mode::Floor:     position.y += sensor.distance; break;
+                    case Mode::RightWall: position.x += sensor.distance; break;
+                    case Mode::Ceiling:   position.y -= sensor.distance; break;
+                    case Mode::LeftWall:  position.x -= sensor.distance; break;
+                }
 
-                // if (not sensor.flag) {
-                    ground_angle = sensor.angle;
-                // } else {
-                    // ground_angle = angle(((ground_angle / 90) % 4) * 90);
-                // }
+                if (not sensor.flag) ground_angle = sensor.angle; else snap_angle();
             }
 
             // Check for slipping/falling when Ground Speed is too low on walls/ceilings.
@@ -149,8 +144,6 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
             // This occurs before the Player's position physically moves, meaning he might not actually be touching
             // the wall yet, the game accounts for this by adding the Player's X Speed and Y Speed to the sensor's position.
             const auto push_mode = push_sensor_mode();
-
-            // Handle camera boundaries (keep the Player inside the view and kill them if they touch the kill plane).
 
             // Move the Player object
             // Calculate X Speed and Y Speed from Ground Speed and Ground Angle.
@@ -216,11 +209,15 @@ void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
     }
 }
 
-void Sonic::debug_draw(draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept {
+void Sonic::debug_draw(std::stringstream& out, draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept {
     auto [ppx, ppy] = pixel_pos();
 
     auto aligned_target = target
         .shift(ppx, ppy);
+
+    out << "Sonic:" << std::endl
+        << "ground angle: " << (u16) ground_angle << std::endl
+        << "speed: x: " << speed.x << " y: " << speed.y << std::endl;
 
     switch (state) {
         case State::Normal: {

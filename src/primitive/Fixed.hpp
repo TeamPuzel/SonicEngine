@@ -7,6 +7,8 @@
 //          Not sure if that's worth my time since I have to port this game back to C++17 anyway.
 #pragma once
 #include "primitive.hpp"
+#include <iostream>
+#include <iomanip>
 
 // Workarounds for the awful version of C++ I have to use, C++17.
 namespace trash {
@@ -99,6 +101,16 @@ class [[clang::trivial_abi]] fixed final { // NOLINT(readability-identifier-nami
     [[clang::always_inline]]
     static constexpr auto into_raw(fixed value) noexcept -> i32 {
         return i32(value.raw);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const fixed& value) {
+        i32 whole = i32(value);
+        u8 fraction = whole > 0 ? u8(value.raw & 0xFF) : 256 - u8(value.raw & 0xFF);
+
+        os << whole << '.'
+           << std::setfill('0') << std::setw(3) << i32(fraction);
+
+        return os;
     }
 };
 

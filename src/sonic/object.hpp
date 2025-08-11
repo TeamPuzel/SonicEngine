@@ -4,12 +4,23 @@
 #include <primitive>
 #include <math>
 #include <rt>
+#include <font>
 #include <type_traits>
+#include <sstream>
+
+// A type-safe and cross-platform object exporter.
+// TODO: Make this work in headers somehow.
+#define EXPORT_SONIC_OBJECT(CLASSNAME)                                               \
+extern "C" void* __sonic_object_deserialize_##CLASSNAME() {                          \
+    static_assert(std::is_same_v<decltype(&CLASSNAME::deserialize), Deserializer*>); \
+    return (void*) &CLASSNAME::deserialize;                                          \
+}
 
 namespace sonic {
     using draw::Image;
     using draw::Ref;
     using draw::Color;
+    using draw::Text;
     using math::point;
     using math::angle;
 
@@ -133,7 +144,8 @@ namespace sonic {
         }
 
         /// Called when debug drawing is enabled, meant to visualise collision etc.
-        virtual void debug_draw(draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept {}
+        /// The object receives the global top-left debug output and the camera slice to draw into freely.
+        virtual void debug_draw(std::stringstream& out, draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept {}
     };
 
     /// A game object which can be serialized.
@@ -209,7 +221,7 @@ namespace sonic {
             } else if (ground_angle >= 226 and ground_angle <= 314) {
                 return Mode::LeftWall;
             } else {
-                return Mode::Floor; // Unreachable backup, std::unreachable wasn't standard prior to C++23.
+                return Mode::Floor; // Unreachable backup.
             }
         }
 
@@ -223,12 +235,26 @@ namespace sonic {
             } else if (ground_angle >= 225 and ground_angle <= 315) {
                 return Mode::LeftWall;
             } else {
-                return Mode::Floor; // Unreachable backup, std::unreachable wasn't standard prior to C++23.
+                return Mode::Floor; // Unreachable backup.
             }
         }
 
         auto general_mode() const noexcept -> Mode {
             return ground_sensor_mode(); // Let's just reuse these elsewhere.
+        }
+
+        void snap_angle() noexcept {
+            if (ground_angle >= 316 and ground_angle <= 44) {
+                ground_angle = 0;
+            } else if (ground_angle >= 45 and ground_angle <= 135) {
+                ground_angle = 90;
+            } else if (ground_angle >= 136 and ground_angle <= 224) {
+                ground_angle = 180;
+            } else if (ground_angle >= 225 and ground_angle <= 315) {
+                ground_angle = 270;
+            } else {
+                ground_angle = 0; // Unreachable backup.
+            }
         }
 
         auto is_half_steep() const noexcept -> bool {
@@ -339,8 +365,9 @@ namespace sonic {
             return Sprite { anim_x + (i32) animator.at(), anim_y, 64, 64, mirror_x, false, (u8) ground_sensor_mode() };
         }
 
-        void debug_draw(draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept override;
+        void debug_draw(std::stringstream& out, draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept override;
 
+        [[gnu::used]]
         static auto deserialize(rt::BinaryReader& reader) -> Box<Object> {
             return Box<Sonic>::make();
         }
@@ -352,6 +379,11 @@ namespace sonic {
     /// Collectable rings.
     class Ring final : public Object {
       public:
+        auto sprite(rt::Input const& input) const noexcept -> Sprite override {
+            return Sprite { 12 + ((i32) input.counter() / 8 % 4), 12, 16, 16 };
+        }
+
+        [[gnu::used]]
         static auto deserialize(rt::BinaryReader& reader) -> Box<Object> {
             return Box<Ring>::make();
         }

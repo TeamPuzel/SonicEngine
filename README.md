@@ -31,11 +31,14 @@ The project can be built on any platform using CMake or Visual Studio. The depen
 The controls can be operated in left handed and right handed modes:
 - Move with arrow keys and jump with X
 - Move with WASD keys and jump with ENTER
-- Hold down to crouch when standing still or roll up when moving.
+- Hold down to crouch while standing still or roll up while moving.
 - Hold down and the jump button while still to charge up a spindash.
-- + and - keys adjust the integer scale the game is rendering at, the default is 4x.
+- (Misc) + and - keys adjust the integer scale the game is rendering at, the default is 4x.
 - (Debug) Press 1 to toggle the visual debug overlay visualizing collision and more.
 - (Debug) Press 2 to override physics and freely fly around.
+- (Debug) Press 8 to toggle the heuristic refresh rate lock.
+- (Debug) Press 9 to toggle the performance and refresh rate heuristic overlay.
+- (Debug) Press 0 to toggle vsync.
 
 There were no other abilities in Sonic 1 yet.
 

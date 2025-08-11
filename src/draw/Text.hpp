@@ -6,12 +6,13 @@
 #pragma once
 #include <primitive>
 #include <string_view>
-#include "drawable.hpp"
+#include "color.hpp"
+#include "plane.hpp"
 #include "image.hpp"
 
 namespace draw {
     template <typename T> struct Symbol final {
-        static_assert(Drawable<T>::value);
+        static_assert(Plane<T>::value);
 
         enum class Type {
             Glyph,
@@ -26,6 +27,9 @@ namespace draw {
             Space space;
         };
 
+        Symbol(Glyph glyph) : type(Type::Glyph), glyph(glyph) {}
+        Symbol(Space space) : type(Type::Space), space(space) {}
+
         auto width() const -> i32 {
             switch (type) {
                 case Type::Glyph: return glyph.width();
@@ -34,17 +38,17 @@ namespace draw {
         }
     };
 
-    template <typename T> struct Font final {
-        static_assert(Drawable<T>::value);
+    template <typename T, typename Chr> struct Font final {
+        static_assert(Plane<T>::value);
 
         T source;
         i32 height;
         i32 baseline;
         i32 spacing;
         i32 leading;
-        auto(map) (T const&, char) -> Symbol<T>;
+        auto (*map) (T const&, Chr) -> Symbol<T>;
 
-        auto symbol(char c) const -> Symbol<T> {
+        auto symbol(Chr c) const -> Symbol<T> {
             return this->map(source, c);
         }
     };
@@ -53,10 +57,16 @@ namespace draw {
     ///
     /// Notably this type performs caching to be remotely efficient while maintaining the composable
     /// drawable interface. This type is not thread-safe and has to be guarded if shared in any way.
-    template <typename T> struct Text final {
-        std::string_view content;
+    ///
+    /// The view type used is generic because C++17 is sad and as usual the version prior to anything nice.
+    /// Not that it's much better now anyway.
+    template <typename T, typename Str = std::string_view> struct Text final {
+        using StringView = Str;
+        using Char = typename Str::value_type;
+
+        StringView content;
         Color color;
-        Font<T> font;
+        Font<T, Char> font;
 
       private:
         i32 width_cache;
@@ -69,17 +79,22 @@ namespace draw {
 
             i32 cursor = 0;
 
-            for (char c : content) {
+            for (Char c : content) {
                 auto sym = font.symbol(c);
                 switch (sym.type) {
                     case SymbolType::Glyph:
-                        // TODO: Map white to the text color.
-                        ret | draw(sym.glyph, cursor, 0, blend::overwrite);
+                        ret | draw(
+                            sym.glyph | draw::map([this] (Color c, i32 x, i32 y) -> Color {
+                                return c == color::WHITE ? color : c;
+                            }),
+                            cursor, 0,
+                            blend::overwrite
+                        );
 
-                        cursor += sym.glyph.width + font.spacing;
+                        cursor += sym.width() + font.spacing;
                         break;
                     case SymbolType::Space:
-                        cursor += sym.space.width;
+                        cursor += sym.width();
                         break;
                 }
             }
@@ -88,14 +103,14 @@ namespace draw {
         }
 
       public:
-        Text(std::string_view content, Font<T> font, Color color = color::WHITE)
+        Text(StringView content, Font<T, Char> font, Color color = color::WHITE)
             : content(content), color(color), font(font)
         {
             if (content.empty()) {
                 this->width_cache = 0;
             } else {
                 i32 acc = -font.spacing;
-                for (char c : content) acc += font.symbol(c).width() + font.spacing;
+                for (Char c : content) acc += font.symbol(c).width() + font.spacing;
                 this->width_cache = acc;
             }
         }
@@ -114,5 +129,7 @@ namespace draw {
         }
     };
 
-    static_assert(SizedDrawable<Text<Image>>::value);
+    template <typename T> Text(char const*, Font<T, char>, Color = color::WHITE) -> Text<T, std::string_view>;
+
+    static_assert(SizedPlane<Text<Image>>::value);
 }

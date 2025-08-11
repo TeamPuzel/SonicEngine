@@ -10,6 +10,9 @@
 #pragma once
 #include <type_traits>
 
+using char16 = char16_t;
+using char32 = char32_t;
+
 using f32 = float;
 using f64 = double;
 

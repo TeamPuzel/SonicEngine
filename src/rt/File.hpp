@@ -6,6 +6,7 @@
 #include <primitive>
 #include <vector>
 #include <fstream>
+#include <dlfcn.h>
 
 namespace rt {
     /// Loads the entirety of a file into program memory.
@@ -171,6 +172,29 @@ namespace rt {
         /// Skips over the given number of bytes.
         void skip(usize count) noexcept {
             this->cursor += count;
+        }
+    };
+
+    class Object final {
+        void* obj;
+
+        Object(void* obj) : obj(obj) {}
+
+      public:
+        static auto open(char const* path) -> Object {
+            Object ret = dlopen(path, RTLD_LAZY);
+            if (not ret.obj) throw std::runtime_error(dlerror());
+            return ret;
+        }
+
+        ~Object() noexcept {
+            dlclose(obj);
+        }
+
+        auto sym(char const* name) const -> void* {
+            auto ret = dlsym(obj, name);
+            if (not ret) throw std::runtime_error(dlerror());
+            return ret;
         }
     };
 }

@@ -30,7 +30,7 @@ class SonicGame final {
     }
 
     template <typename T> void draw(rt::Input const& input, T& target) const {
-        static_assert(draw::SizedDrawable<T>::value and draw::MutableDrawable<T>::value);
+        static_assert(draw::SizedPlane<T>::value and draw::MutablePlane<T>::value);
         scene->draw(input, target, sheet, background);
     }
 };

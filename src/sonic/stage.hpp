@@ -6,7 +6,6 @@
 #include <primitive>
 #include <rt>
 #include <sstream>
-#include <stdexcept>
 #include <vector>
 #include <functional>
 #include "scene.hpp"
@@ -54,6 +53,10 @@ namespace sonic {
         bool mirror_x;
         bool mirror_y;
 
+        constexpr auto empty() const noexcept -> bool {
+            return x == -1 and y == -1;
+        }
+
         static auto read(rt::BinaryReader& reader) -> SolidTile {
             const auto x = reader.i32();
             const auto y = reader.i32();
@@ -88,10 +91,12 @@ namespace sonic {
         bool visual_debug { false };
         bool movement_debug { false };
 
+        [[gnu::hot]] [[gnu::const]]
         auto tile(i32 x, i32 y) const -> Tile const& {
             return foreground.at(y + x * height);
         }
 
+        [[gnu::hot]] [[gnu::const]]
         auto solid_tile(i32 x, i32 y) const -> SolidTile const& {
             return collision.at(y + x * height);
         }
@@ -102,8 +107,18 @@ namespace sonic {
             if (input.key_pressed(rt::Key::Num1)) visual_debug = !visual_debug;
             if (input.key_pressed(rt::Key::Num2)) movement_debug = !movement_debug;
 
+            const auto [px, py] = primary->pixel_pos();
+            constexpr i32 X_UPDATE_DISTANCE = 320 + 320 / 2;
+            constexpr i32 Y_UPDATE_DISTANCE = 224 + 224 / 2;
+
+            // We don't update objects too far away from the primary.
+            //
+            // The original resolution is 320x224 so the approximation used will be only processing
+            // objects when they are an original screen and a half distance away.
             for (Box<Object>& object : objects) {
-                object->update(input, *this);
+                const auto [ox, oy] = object->pixel_pos();
+                if (std::abs(ox - px) < X_UPDATE_DISTANCE and std::abs(oy - py) < Y_UPDATE_DISTANCE)
+                    object->update(input, *this);
             }
 
             tick += 1;
@@ -111,7 +126,7 @@ namespace sonic {
 
         /// We receive three things, an inout mutable image representing the screen to render into,
         /// another image which is the sprite sheet and one to slice the background from.
-        void draw(
+        [[gnu::hot]] void draw(
             rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
         ) const override {
             // We will first assemble a buffer of draw commands, this way we can easily sort before rendering later.
@@ -158,11 +173,28 @@ namespace sonic {
             }
 
             // Schedule objects for rendering as well.
-            // TODO: Avoid scheduling off-screen objects.
-            for (Box<Object> const& object : objects) {
-                auto command = DrawCommand { DrawCommand::Type::Object };
-                command.object.ref = *object;
-                commands.push_back(command);
+            // Objects more than a screen away from the edge are not drawn.
+            {
+                const i32 buffer_x = target.width();
+                const i32 buffer_y = target.height();
+
+                // Visible rectangle in world coordinates.
+                const i32 view_min_x = -camera_x - buffer_x;
+                const i32 view_max_x = -camera_x + target.width() + buffer_x;
+                const i32 view_min_y = -camera_y - buffer_y;
+                const i32 view_max_y = -camera_y + target.height() + buffer_y;
+
+                for (Box<Object> const& object : objects) {
+                    const auto [ox, oy] = object->pixel_pos();
+
+                    if (ox >= view_min_x and ox <= view_max_x and
+                        oy >= view_min_y and oy <= view_max_y
+                    ) {
+                        auto command = DrawCommand { DrawCommand::Type::Object };
+                        command.object.ref = *object;
+                        commands.push_back(command);
+                    }
+                }
             }
 
             // We are now ready to start drawing the stage.
@@ -277,6 +309,8 @@ namespace sonic {
 
             // If the debug visuals are enabled draw them as well.
             if (visual_debug) {
+                std::stringstream out;
+
                 for (const auto command : commands) {
                     if (command.type == DrawCommand::Type::Tile) {
                         auto const& tile = this->solid_tile(command.tile.x, command.tile.y);
@@ -294,11 +328,26 @@ namespace sonic {
                             command.tile.x * 16, command.tile.y * 16,
                             draw::blend::alpha
                         );
+
+                        if (not tile.empty()) {
+                            std::stringstream angle_out;
+                            if (not tile.flag) angle_out << (u32) tile.angle; else angle_out << "flg";
+
+                            camera_target | draw::draw(
+                                Text(angle_out.str(), font::pico()),
+                                command.tile.x * 16, command.tile.y * 16
+                            );
+                        }
                     }
                     if (command.type == DrawCommand::Type::Object) {
                         Object const& object = command.object.ref.get();
-                        object.debug_draw(camera_target, *this);
+                        object.debug_draw(out, camera_target, *this);
                     }
+                }
+
+                std::string line;
+                for (i32 y = 8; std::getline(out, line); y += font::mine().height + font::mine().leading) {
+                    target | draw::draw(Text(line, font::mine()), 8, y);
                 }
             }
         }
@@ -307,167 +356,102 @@ namespace sonic {
 
         struct SensorResult final { i32 distance; math::angle angle; bool flag; };
 
-        /// The sensor logic is implemented differently, given the significant CPU improvement since then
-        /// the game can just dynamically figure out the height arrays from the reference images on the fly.
-        auto sense(i32 x, i32 y, SensorDirection direction) const -> SensorResult {
-            // Figure out current tile coordinates.
-            const i32 tx = x / 16, ty = y / 16;
-            // Figure out the local pixel coordinates.
-            const i32 lx = x % 16, ly = y % 16;
-
-            auto height_grid = height_tiles | draw::grid(16, 16);
-
-            // Computes the conceptual height arrays from a reference image.
-            // This was just 2 precomputed arrays in the original but this is simpler with my setup.
-            const auto height_of = [lx, ly, direction] (auto const& t) -> i32 {
-                switch (direction) {
-                    case SensorDirection::Down:
-                        for (i32 y_off = 0; y_off < 16; y_off += 1)
-                            if (t.get(lx, y_off) == draw::color::WHITE) return 16 - y_off;
-                        return 0;
-                    case SensorDirection::Right:
-                        for (i32 x_off = 15; x_off >= 0; x_off -= 1)
-                            if (t.get(x_off, ly) == draw::color::WHITE) return x_off + 1;
-                        return 0;
-                    case SensorDirection::Up:
-                        for (i32 y_off = 15; y_off >= 0; y_off -= 1)
-                            if (t.get(lx, y_off) == draw::color::WHITE) return y_off + 1;
-                        return 0;
-                    case SensorDirection::Left:
-                        for (i32 x_off = 0; x_off < 16; x_off += 1)
-                            if (t.get(x_off, ly) == draw::color::WHITE) return 16 - x_off;
-                        return 0;
-                }
-                return 0;
-            };
-
-            // Converts height to the local pixel offset (0..15) inside that tile.
-            const auto localize = [direction] (i32 height) -> i32 {
-                return direction == SensorDirection::Down or direction == SensorDirection::Left
-                    ? 16 - height
-                    : height - 1;
-            };
-
-            // Computes signed distance from sensor to a surface located in a given tile.
-            const auto distance_to_surface = [x, y, direction] (i32 tile_x, i32 tile_y, i32 local) -> i32 {
-                const i32 global_x = tile_x * 16 + local, global_y = tile_y * 16 + local;
-                switch (direction) {
-                    case SensorDirection::Down:  return global_y - y;
-                    case SensorDirection::Right: return global_x - x;
-                    case SensorDirection::Up:    return y - global_y;
-                    case SensorDirection::Left:  return x - global_x;
-                }
-            };
-
-            // Returns the tile and its position for regression.
-            const auto regress = [this, tx, ty, direction] () -> std::tuple<SolidTile const&, i32, i32> {
-                switch (direction) {
-                    case SensorDirection::Down:  return { solid_tile(tx,     ty - 1), tx,     ty - 1 };
-                    case SensorDirection::Right: return { solid_tile(tx - 1, ty    ), tx - 1, ty     };
-                    case SensorDirection::Up:    return { solid_tile(tx,     ty + 1), tx,     ty + 1 };
-                    case SensorDirection::Left:  return { solid_tile(tx + 1, ty    ), tx + 1, ty     };
-                }
-            };
-
-            // Returns the tile and its position for extension.
-            const auto extend = [this, tx, ty, direction] () -> std::tuple<SolidTile const&, i32, i32> {
-                switch (direction) {
-                    case SensorDirection::Down:  return { solid_tile(tx,     ty + 1), tx,     ty + 1 };
-                    case SensorDirection::Right: return { solid_tile(tx + 1, ty    ), tx + 1, ty     };
-                    case SensorDirection::Up:    return { solid_tile(tx,     ty - 1), tx,     ty - 1 };
-                    case SensorDirection::Left:  return { solid_tile(tx - 1, ty    ), tx - 1, ty     };
-                }
-            };
-
-            // Now that everything is well defined we can apply the actual logic.
-
-            auto const& exact_tile = solid_tile(tx, ty);
-            auto exact = height_grid.tile(exact_tile.x, exact_tile.y)
-                | draw::apply_if(exact_tile.mirror_x, draw::mirror_x())
-                | draw::apply_if(exact_tile.mirror_y, draw::mirror_y());
-            const i32 exact_height = height_of(exact);
-
-            if (exact_height > 0 and exact_height < 16) {
-                return {
-                    distance_to_surface(tx, ty, localize(exact_height)),
-                    math::angle(exact_tile.angle),
-                    exact_tile.flag,
-                };
-            } else if (exact_height == 0) {
-                auto [extended_tile, etx, ety] = extend();
-                auto extended = height_grid.tile(extended_tile.x, extended_tile.y)
-                    | draw::apply_if(extended_tile.mirror_x, draw::mirror_x())
-                    | draw::apply_if(extended_tile.mirror_y, draw::mirror_y());
-                const i32 extended_height = height_of(extended);
-
-                // We extend if the current tile is empty, this one is intuitive.
-                if (extended_height == 0) {
-                    i32 edge_local = (direction == SensorDirection::Down or direction == SensorDirection::Right) ? 15 : 0;
-                    return {
-                        distance_to_surface(etx, ety, edge_local),
-                        math::angle(extended_tile.angle),
-                        extended_tile.flag,
-                    };
-                } else {
-                    return {
-                        distance_to_surface(etx, ety, localize(extended_height)),
-                        math::angle(extended_tile.angle),
-                        extended_tile.flag,
-                    };
-                }
-            } else {
-                auto [regressed_tile, rtx, rty] = regress();
-                auto regressed = height_grid.tile(regressed_tile.x, regressed_tile.y)
-                    | draw::apply_if(regressed_tile.mirror_x, draw::mirror_x())
-                    | draw::apply_if(regressed_tile.mirror_y, draw::mirror_y());
-                const i32 regressed_height = height_of(regressed);
-
-                // Regression is a bit less intuitive so here's an explanation.
-                // We regress in case we are unsure if the tile is the actual edge
-                // or if terrain extends another tile still.
-                // If we find that it was already the actual edge then we ignore the regression.
-                if (regressed_height == 0) {
-                    return {
-                        distance_to_surface(tx, ty, localize(exact_height)),
-                        math::angle(exact_tile.angle),
-                        exact_tile.flag,
-                    };
-                } else {
-                    return {
-                        distance_to_surface(rtx, rty, localize(regressed_height)),
-                        math::angle(regressed_tile.angle),
-                        regressed_tile.flag,
-                    };
-                }
-            }
+        /// Inlining this is rather important, we are doing some composition and this is called in a loop
+        /// so we'd get janky stack shenanigans if we actually called this.
+        [[clang::always_inline]] [[gnu::hot]] [[gnu::const]] auto solid_at(i32 x, i32 y) const -> bool {
+            auto const& tile = solid_tile(x / 16, y / 16);
+            return height_tiles
+                | draw::grid(16, 16)
+                | draw::tile(tile.x, tile.y)
+                | draw::apply_if(tile.mirror_x, draw::mirror_x())
+                | draw::apply_if(tile.mirror_y, draw::mirror_y())
+                | draw::get(x % 16, y % 16)
+                | draw::eq(draw::color::WHITE);
         }
 
-        [[clang::always_inline]]
+        /// The sensor logic is implemented differently, given the significant CPU improvement since then.
+        /// We just analyze the height map in pixel-space instead of the 1991 logic of regressing through tiles.
+        /// At the end of the day objects just want the distance and they do not care if the entire range is consistent
+        /// as they always considered only the consistent subrange within. I can't believe I spent days on
+        /// this nonsense instead of just doing the obious thing.
+        [[gnu::const]]
+        auto sense(i32 x, i32 y, SensorDirection direction) const -> SensorResult {
+            i32 cx = x, cy = y;
+
+            const i32 max_distance = 32;
+
+            const auto regress = [&] {
+                switch (direction) {
+                    case SensorDirection::Down:  cy -= 1; break;
+                    case SensorDirection::Right: cx -= 1; break;
+                    case SensorDirection::Up:    cy += 1; break;
+                    case SensorDirection::Left:  cx += 1; break;
+                }
+            };
+
+            const auto extend = [&] {
+                switch (direction) {
+                    case SensorDirection::Down:  cy += 1; break;
+                    case SensorDirection::Right: cx += 1; break;
+                    case SensorDirection::Up:    cy -= 1; break;
+                    case SensorDirection::Left:  cx -= 1; break;
+                }
+            };
+
+            const auto distance = [&] {
+                switch (direction) {
+                    case SensorDirection::Down:  return cy - y;
+                    case SensorDirection::Right: return cx - x;
+                    case SensorDirection::Up:    return y - cy;
+                    case SensorDirection::Left:  return x - cx;
+                }
+            };
+
+            const auto within_limit = [&] {
+                const auto d = distance();
+                return -32 <= d and d <= 32;
+            };
+
+            // There are two cases, either we are within terrain and we need to regress or we are not inside of terrain
+            // and we need to extend.
+            if (solid_at(cx, cy)) {
+                do regress(); while (solid_at(cx, cy) and within_limit());
+            } else {
+                do extend(); while (not solid_at(cx, cy) and within_limit());
+                regress();
+            }
+
+            auto const& tile = solid_tile(cx / 16, cy / 16);
+
+            return { distance(), tile.angle, tile.flag };
+        }
+
+        [[clang::always_inline]] [[gnu::const]]
         auto sense(Object const* relative_space, i32 x, i32 y, SensorDirection direction) const -> SensorResult {
             auto [ox, oy] = relative_space->pixel_pos();
             return sense(x + ox, y + oy, direction);
         }
 
-        [[clang::always_inline]]
+        [[clang::always_inline]] [[gnu::const]]
         static auto rotate(SensorDirection direction, u32 by_steps) noexcept -> SensorDirection {
             return (SensorDirection) (((u32) direction + by_steps) % 4);
         }
 
-        [[clang::always_inline]]
+        [[clang::always_inline]] [[gnu::const]]
         static auto rotate(i32 x, i32 y, i32 steps) noexcept -> std::pair<i32, i32> {
             steps = ((steps % 4) + 4) % 4;
 
             switch (steps) {
                 case 0: return { +x, +y };
-                case 1: return { -y, +x };
+                case 1: return { +y, -x };
                 case 2: return { -x, -y };
-                case 3: return { +y, -x };
+                case 3: return { -y, +x };
             }
 
             intr::unreachable();
         }
 
-        [[clang::always_inline]]
+        [[clang::always_inline]] [[gnu::const]]
         auto sense(Sonic const* relative_space, i32 x, i32 y, SensorDirection direction, Sonic::Mode mode) const -> SensorResult {
             const auto [rx, ry] = rotate(x, y, (i32) mode);
             return sense(relative_space, rx, ry, rotate(direction, (u32) mode));
@@ -475,9 +459,9 @@ namespace sonic {
 
         /// Visualises a sensor within a target.
         /// The target's origin should align with the relative space origin and need not have size.
-        template <typename T> [[clang::always_inline]]
+        template <typename T>
         void sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, T target, Color color) const {
-            static_assert(draw::MutableDrawable<T>::value);
+            static_assert(draw::MutablePlane<T>::value);
             const auto res = sense(relative_space, x, y, direction);
 
             switch (direction) {
@@ -488,19 +472,19 @@ namespace sonic {
             }
         }
 
-        template <typename T> [[clang::always_inline]]
+        template <typename T>
         void sense_draw(Sonic const* relative_space, i32 x, i32 y, SensorDirection direction, Sonic::Mode mode, T target, Color color) const {
-            static_assert(draw::MutableDrawable<T>::value);
+            static_assert(draw::MutablePlane<T>::value);
             const auto res = sense(relative_space, x, y, direction, mode);
 
             auto rotated_target = target
-                | draw::rotate((u8) mode);
+                | draw::rotate_global((u8) mode);
 
-            switch (rotate(direction, (u32) mode)) {
-                case SensorDirection::Down:  target | draw::line(x, y, x, y + res.distance, color); break;
-                case SensorDirection::Right: target | draw::line(x, y, x + res.distance, y, color); break;
-                case SensorDirection::Up:    target | draw::line(x, y, x, y - res.distance, color); break;
-                case SensorDirection::Left:  target | draw::line(x, y, x - res.distance, y, color); break;
+            switch (direction) {
+                case SensorDirection::Down:  rotated_target | draw::line(x, y, x, y + res.distance, color); break;
+                case SensorDirection::Right: rotated_target | draw::line(x, y, x + res.distance, y, color); break;
+                case SensorDirection::Up:    rotated_target | draw::line(x, y, x, y - res.distance, color); break;
+                case SensorDirection::Left:  rotated_target | draw::line(x, y, x - res.distance, y, color); break;
             }
         }
 
@@ -539,8 +523,8 @@ namespace sonic {
                 const auto deserializer = registry(classname);
                 if (not deserializer) {
                     std::stringstream msg;
-                    msg << "Attempted to deserialize a class not present in the provided registry: class ";
-                    msg << classname;
+                    msg << "Attempted to deserialize a class not present in the provided registry: class "
+                        << classname;
                     throw std::runtime_error(msg.str());
                 }
 
@@ -561,9 +545,26 @@ namespace sonic {
         }
     };
 
+    #ifdef __clang__
+    /// Rather than putting all the classes here we can introspect the binary itself and find the static method.
+    /// This code is sound when targeting the itanium ABI. The exception here is of course Windows.
+    ///
+    /// Why is this better?
+    ///
+    /// Well, we can use it to deserialize objects from shared libraries. Once there is a built-in level editor
+    /// It will be possible to hot reload classes on the fly.
+    static auto registry(std::string_view classname) -> Deserializer* {
+        std::stringstream mangled_name;
+        mangled_name << "_ZN5sonic" << classname.size() << classname << "11deserializeERN2rt12BinaryReaderE";
+        static auto self = rt::Object::open(nullptr);
+        return (Deserializer*) self.sym(mangled_name.str().c_str());
+    }
+    #else
+    /// Manual deserializer registry.
     static auto registry(std::string_view classname) -> Deserializer* {
         if (classname == "Ring")  return Ring::deserialize;
         if (classname == "Sonic") return Sonic::deserialize;
         return nullptr;
     }
+    #endif
 }

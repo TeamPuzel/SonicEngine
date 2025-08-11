@@ -22,10 +22,17 @@ namespace math {
         constexpr angle() noexcept {};
 
         /// Construction of angles is explicit as otherwise math would be pretty easy to mess up otherwise.
-        constexpr explicit angle(u16 raw) noexcept : raw(raw % 360) {}
+        constexpr angle(u16 raw) noexcept : raw(raw % 360) {}
 
-        [[clang::always_inline]]
-        constexpr operator u32() const noexcept {
+        [[clang::always_inline]] constexpr explicit operator u64() const noexcept {
+            return raw;
+        }
+
+        [[clang::always_inline]] constexpr explicit operator u32() const noexcept {
+            return raw;
+        }
+
+        [[clang::always_inline]] constexpr explicit operator u16() const noexcept {
             return raw;
         }
 
@@ -45,7 +52,39 @@ namespace math {
             *this = angle(raw - other.raw);
         }
     };
+}
 
+[[clang::always_inline]]
+constexpr auto operator==(math::angle lhs, math::angle rhs) noexcept -> bool {
+    return u16(lhs) == u16(rhs);
+}
+
+[[clang::always_inline]]
+constexpr auto operator!=(math::angle lhs, math::angle rhs) noexcept -> bool {
+    return u16(lhs) != u16(rhs);
+}
+
+[[clang::always_inline]]
+constexpr auto operator<(math::angle lhs, math::angle rhs) noexcept -> bool {
+    return u16(lhs) < u16(rhs);
+}
+
+[[clang::always_inline]]
+constexpr auto operator<=(math::angle lhs, math::angle rhs) noexcept -> bool {
+    return u16(lhs) <= u16(rhs);
+}
+
+[[clang::always_inline]]
+constexpr auto operator>(math::angle lhs, math::angle rhs) noexcept -> bool {
+    return u16(lhs) > u16(rhs);
+}
+
+[[clang::always_inline]]
+constexpr auto operator>=(math::angle lhs, math::angle rhs) noexcept -> bool {
+    return u16(lhs) >= u16(rhs);
+}
+
+namespace math {
     namespace detail {
         static constexpr fixed SIN_TABLE[360] = {
             fixed(0,   0),
@@ -775,10 +814,10 @@ namespace math {
     }
 
     constexpr auto sin(angle a) noexcept -> fixed {
-        return detail::SIN_TABLE[a];
+        return detail::SIN_TABLE[(u32) a];
     }
 
     constexpr auto cos(angle a) noexcept -> fixed {
-        return detail::COS_TABLE[a];
+        return detail::COS_TABLE[(u32) a];
     }
 }

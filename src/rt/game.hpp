@@ -5,11 +5,15 @@
 #pragma once
 #include <primitive>
 #include <draw>
+#include <font>
+#include <sstream>
 #include <string>
 #include <optional>
 #include <atomic>
 #include <unordered_set>
 #include <iostream>
+#include <chrono>
+#include <numeric>
 #include <SDL3/SDL.h>
 
 namespace rt {
@@ -240,7 +244,7 @@ namespace rt {
       public:
         void poll() {
             // TODO: Apply scale to mouse input. Unused in this game anyway so it's whatever.
-            float x, y;
+            f32 x, y;
             auto btn = SDL_GetMouseState(&x, &y);
             i32 ix = i32(x), iy = i32(y);
             mouse() = Mouse {
@@ -267,42 +271,109 @@ namespace rt {
         return ManagedSdlInput {};
     }
 
-    class ManagedSdlRefreshRateLock final {
-        u32 rate;
+    inline auto timestamp() -> f64 {
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        return std::chrono::duration<f64, std::milli>(now).count();
+    }
+
+    class Timer final {
+        f64 prev_time;
 
       public:
-        void poll(SDL_Window * window) {
-            auto mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
-            this->rate = mode->refresh_rate_numerator;
+        Timer() : prev_time(timestamp()) {}
+
+        auto elapsed() const -> f64 {
+            return timestamp() - prev_time;
+        }
+
+        auto lap() -> f64 {
+            const auto e = elapsed();
+            prev_time = timestamp();
+            return e;
+        }
+    };
+
+    /// Accumulates time steps to guess the refresh rate since the SDL platform does not
+    /// provide any way to query it otherwise.
+    class HeuristicTimestampBasedRefreshRateLock final {
+        std::vector<f64> acc;
+        f64 previous_stamp { timestamp() };
+
+      public:
+        enum CommonRate : u32 {
+            Hz30  = 30,
+            Hz60  = 60,
+            Hz75  = 75,
+            Hz90  = 90,
+            Hz120 = 120,
+            Hz144 = 144,
+            Hz240 = 240,
+            Hz360 = 360,
+        };
+
+        f64 estimated_millis;
+        u32 estimated_hertz;
+        std::optional<CommonRate> common_rate;
+
+        void lap() {
+            // SAFETY: Just an environment query.
+            const f64 stamp = timestamp();
+            const f64 elapsed = stamp - previous_stamp;
+
+            acc.insert(acc.begin(), elapsed);
+
+            previous_stamp = stamp;
+
+            if (acc.size() > 120) acc.pop_back();
+
+            const f64 average = std::accumulate(acc.begin(), acc.end(), 0.0)
+                / (f64) acc.size();
+
+            const auto common_rates = {
+                Hz30, Hz60, Hz75, Hz90, Hz120, Hz144, Hz240, Hz360,
+            };
+
+            estimated_millis = average;
+            estimated_hertz = u32(1000.0 / average);
+            for (const auto rate : common_rates) {
+                constexpr f64 ERROR = 0.5;
+                const f64 closest = 1000.0 / (f64) (u32) rate;
+                if (std::abs(average - closest) <= ERROR) {
+                    common_rate = rate; break;
+                }
+            }
         }
 
         auto compatible_with_tick(u32 tick) const -> bool {
-            return rate % tick == 0;
+            return estimated_hertz % tick == 0;
         }
 
         /// Given the frame count and a target hertz makes an effort to invoke the provided callable
         /// at a consistent rate in sync with the display, ideally by alternating frames on which
         /// it attempts to draw when the rate is divisible or close to it.
+        ///
+        /// Passing zero as the desired rate bypasses the lock.
         template <typename Fn> [[nodiscard]] auto sync(usize frame, u32 desired_rate, Fn f) const -> bool {
-            if (desired_rate == 0) throw std::runtime_error("Division by zero");
-            if (compatible_with_tick(desired_rate)) {
-                const auto tick_frames = rate / desired_rate;
+            if (desired_rate == 0) {
+                f();
+                return true;
+            } else {
+                const u32 tick_frames = (common_rate ? (u32) *common_rate : estimated_hertz)
+                    / (u32) desired_rate;
 
                 if (tick_frames != 0 and frame % tick_frames == 0) {
                     f();
                 }
 
                 return true;
-            } else {
-                return false;
             }
         }
     };
 
-    /// Returns a concrete type implementing the refresh rate interface.
+    /// Returns a concrete type implementing the refresh rate lock interface.
     /// The exact type could change in the future.
     inline auto refresh_rate_lock() {
-        return ManagedSdlRefreshRateLock {};
+        return HeuristicTimestampBasedRefreshRateLock {};
     }
 
     /// Defines a game runnable by a game executor. The default is `run(game)`.
@@ -317,7 +388,7 @@ namespace rt {
     /// issue caused by being forced to support old C++.
     template <typename, typename = draw::Image, typename = void> struct Game : std::false_type {};
     template <typename Self, typename Target> struct Game<Self, Target, std::enable_if_t<
-        draw::SizedDrawable<Target>::value and draw::MutableDrawable<Target>::value and
+        draw::SizedPlane<Target>::value and draw::MutablePlane<Target>::value and
         std::is_same<decltype(std::declval<Self&>().update(std::declval<Input const&>())), void>::value and
         std::is_same<decltype(std::declval<Self const&>().draw(std::declval<Input const&>(), std::declval<Target&>())), void>::value
     >> : std::true_type {};
@@ -392,7 +463,8 @@ namespace rt {
         }
         // We can discard the error, it is inefficient not to use vsync but if a platform doesn't support it
         // we have much greater issues than rendering too fast and it's impressive we even got this far.
-        (void) SDL_SetRenderVSync(renderer, 1);
+        // i.e. that kind of platform is probably better suited for a different runtime implementation.
+        bool is_vsync = SDL_SetRenderVSync(renderer, 1);
 
         // Not const because we reallocate on window resize.
         //
@@ -426,6 +498,8 @@ namespace rt {
 
         SDL_Event event;
         usize frame = 0;
+        bool perf_overlay = false;
+        bool heuristic_rate_lock = true;
         auto target = draw::Image(width / scale, height / scale);
         auto input = rt::input();
         auto rate = rt::refresh_rate_lock();
@@ -450,11 +524,45 @@ namespace rt {
             }
 
             // Ensure stable 60hz.
-            rate.poll(window);
-            const auto could_sync = rate.sync(frame, 60, [&]{
+            rate.lap();
+
+            const auto draw_perf_overlay = [&] {
+                std::stringstream out;
+                out << "Assumed rate: ";
+                if (rate.common_rate) out << *rate.common_rate; else out << "Unknown";
+                out << std::endl
+                    << "Estimated rate: " << rate.estimated_hertz << std::endl
+                    << "Average ms: " << rate.estimated_millis << std::endl
+                    << "Vsync status: " << (is_vsync ? "Enabled" : "Disabled") << std::endl
+                    << "Heuristic lock status: " << (heuristic_rate_lock ? "Enabled" : "Disabled") << std::endl;
+
+                std::string line;
+                std::vector<std::pair<draw::Text<draw::Ref<const draw::Image>, std::string>, i32>> lines;
+                for (i32 y = 8; std::getline(out, line); y += font::mine().height + font::mine().leading) {
+                    lines.emplace_back(draw::Text(line, font::mine()), y);
+                }
+
+                i32 greatest_width = 0;
+                for (auto const& [text, y] : lines) if (text.width() > greatest_width) greatest_width = text.width();
+                for (auto const& [text, y] : lines) target | draw::draw(text, target.width() - 8 - greatest_width, y);
+            };
+
+            const bool could_sync = rate.sync(frame, heuristic_rate_lock ? 60 : 0, [&]{
                 input.poll();
+
+                { // Process runtime specific debug options.
+                    if (input.key_pressed(Key::Num0)) {
+                        is_vsync = !is_vsync;
+                        SDL_SetRenderVSync(renderer, is_vsync);
+                    }
+                    if (input.key_pressed(Key::Num8)) heuristic_rate_lock = !heuristic_rate_lock;
+                    if (input.key_pressed(Key::Num9)) perf_overlay = !perf_overlay;
+                }
+
                 game.update(input);
                 game.draw(input, target);
+
+                if (perf_overlay) draw_perf_overlay();
             });
             if (not could_sync) {
                 // TODO: Show diagnostic message in the corner or something instead.
