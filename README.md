@@ -13,8 +13,8 @@ Why this game:
 The minimum I will definitely make:
 - The first and most iconic Sonic level, Act 1 of Green Hill Zone from the first game.
 - Make sure the code can compile in C++17 mode.
-- Ensure it compiles with broken compilers like MSVC which can *crash* while parsing labels. Pathetic. It also runs out of memory
-without horrible hacks. I would never rely on such low quality and proprietary software in a serious project :)
+- Hot reloading of game object classes at runtime (really cool).
+- Try to ensure it compiles with sad compilers like MSVC.
 
 If I have the time I will also make:
 - Act 2 and 3 since they share most of their assets with the first stage. (Spoke too soon, the physics were hard to implement)
@@ -25,6 +25,7 @@ The project can be built on any platform using CMake or Visual Studio. The depen
 
 - C++ standard library
 - SDL3
+- (ideally) gnu-make, cmake and ninja (visual studio only compiles the engine without hot-reloading)
 
 ## How to play
 
@@ -39,6 +40,7 @@ The controls can be operated in left handed and right handed modes:
 - (Debug) Press 8 to toggle the heuristic refresh rate lock.
 - (Debug) Press 9 to toggle the performance and refresh rate heuristic overlay.
 - (Debug) Press 0 to toggle vsync.
+- (Development) Press R to hot reload object classes.
 
 There were no other abilities in Sonic 1 yet.
 
@@ -46,12 +48,14 @@ Note that in Sonic 1 there is a speed cap unless rolled up so that would be the 
 
 ## Class structure
 
-The game itself uses a very boring, standard class structure.
+The game itself uses a very standard class structure.
+Do note that the game objects are in the object directory, not src as they are compiled as libraries
+and loaded by the engine proper at runtime as needed.
 
 ```
 Game -> Scene
-          |-> Stage -> [Object]
-          |-> ... and many other simple scenes like the opening screen or death screen.
+          |-> Stage -> [(dynlib) Object]
+          |-> ... and potentially other simple scenes like the opening screen or death screen.
 ```
 
 ### Object composition
@@ -70,15 +74,9 @@ There are two main (both flat) inheritance hierarchies in the gameplay implement
 There's some other minor uses of inheritance mainly for metaprogramming purposes. Most of my abstraction
 is achieved through C++ traits rather than inheritance.
 
-There is more advanced subtyping present with a deeper subtyping hierarchy but it is again using traits for efficiency.
-Specifically, `Drawable` the infinite supertype of all graphics, `SizedDrawable`, subtype of `Drawable` describing a concrete
-area of the conceptual infinite plane, `MutableDrawable` which is quite self explanatory and (an unwritten, used individually) intersection of
-these two `Drawable` subtypes required for rendering, `SizedDrawable + MutableDrawable` or in other words `SizedMutableDrawable`.
-This is beyond the capability of most inheritance systems and while C++ has multiple inheritance this is not expressible
-well and on top of that INCREDIBLY inefficient. As soon as these traits would implement virtual dispatch C++ compilers
-would never optimize and devirtualize them (I have tested it). Dynamic, uninlined dispatch through a dozen nested virtual
-calls for every single pixel drawn is painfully slow, obviously, and is very viral in that these dynamic constructs can
-only deal with other dynamic constructs themselves, propagating inefficiency all the way through.
+Objects are quite notably very virtual because they are compiled into separate dynamic libraries
+making them hot-swappable at runtime. Since objects see each other and are recompiled together
+this means even non-virtual changes to the types are sound and propagate after reloading.
 
 ## Contact
 

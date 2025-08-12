@@ -1,0 +1,45 @@
+// Created by Lua (TeamPuzel) on August 12th 2025.
+// Copyright (c) 2025 All rights reserved.
+//
+// This header defines utilities for safely reloading object classes at runtime.
+#pragma once
+#include <rt>
+#include <type_traits>
+
+// A type-safe and cross-platform object exporter.
+// This is not for use in headers but rather the object entry point to expose it
+// from the shared object file.
+#define EXPORT_SONIC_OBJECT(CLASSNAME)                       \
+static_assert(DynamicObject<CLASSNAME>::value);              \
+extern "C" ObjectRebuilder __sonic_object_rebuild() {        \
+    return (ObjectRebuilder) &CLASSNAME::rebuild;            \
+}                                                            \
+extern "C" ObjectSerializer __sonic_object_serialize() {     \
+    return (ObjectSerializer) &CLASSNAME::serialize;         \
+}                                                            \
+extern "C" ObjectDeserializer __sonic_object_deserialize() { \
+    return (ObjectDeserializer) &CLASSNAME::deserialize;     \
+}
+
+namespace sonic {
+    class Object;
+
+    /// A game object loadable from files and hot-reloadable during gameplay.
+    /// Obviously don't attempt rebuilding if the ABI was broken between reloads.
+    ///
+    /// trait SerializableObject {
+    ///     static rebuild(Self const*);
+    ///     static serialize(Self const&, BinaryWriter&);
+    ///     static deserialize(BinaryReader&) -> Self;
+    /// }
+    template <typename, typename = void> struct DynamicObject : std::false_type {};
+    template <typename Self> struct DynamicObject<Self, std::enable_if_t<
+        std::is_same<decltype(Self::rebuild(std::declval<Self const&>())), Box<Object>>::value and
+        std::is_same<decltype(std::declval<Self const&>().serialize(std::declval<rt::BinaryWriter&>())), void>::value and
+        std::is_same<decltype(Self::deserialize(std::declval<rt::BinaryReader&>())), Box<Object>>::value
+    >> : std::true_type {};
+
+    using ObjectRebuilder    = auto (*) (Object const&) -> Box<Object>;
+    using ObjectDeserializer = auto (*) (rt::BinaryReader&) -> Box<Object>;
+    using ObjectSerializer   = auto (Object::*const) (rt::BinaryWriter&) -> void;
+}

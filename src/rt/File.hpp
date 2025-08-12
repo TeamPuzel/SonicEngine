@@ -33,6 +33,8 @@ namespace rt {
         return buffer;
     }
 
+    class BinaryWriter final {};
+
     /// A sound implementation of a binary data reader for serialization purposes.
     ///
     /// It reads data out by individual bytes so alignment is not relevant,
@@ -181,14 +183,34 @@ namespace rt {
         Object(void* obj) : obj(obj) {}
 
       public:
-        static auto open(char const* path) -> Object {
-            Object ret = dlopen(path, RTLD_LAZY);
+        static auto open(char const *path) -> Object {
+            Object ret = dlopen(path, RTLD_NOW | RTLD_LOCAL);
             if (not ret.obj) throw std::runtime_error(dlerror());
             return ret;
         }
 
+        Object(Object const&) = delete;
+        auto operator=(Object const&) -> Object& = delete;
+
+        Object(Object&& other) noexcept : obj(other.obj) {
+            other.obj = nullptr;
+        }
+
+        auto operator=(Object&& other) noexcept -> Object& {
+            if (this != &other) {
+                if (obj) dlclose(obj);
+                obj = other.obj;
+                other.obj = nullptr;
+            }
+            return *this;
+        }
+
+
         ~Object() noexcept {
-            dlclose(obj);
+            if (obj) {
+                dlclose(obj);
+                obj = nullptr;
+            }
         }
 
         auto sym(char const* name) const -> void* {

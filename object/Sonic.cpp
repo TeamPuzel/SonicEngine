@@ -1,13 +1,8 @@
-// Created by Lua (TeamPuzel) on May 26th 2025.
-// Copyright (c) 2025 All rights reserved.
-//
-// Because C++ is a sad language some object update implementations need to be moved here.
-// Since they are virtual it's of no consequence to the compiler's ability to optimize but it is still
-// very inconvenient. C++ has no redeeming qualities tbh.
-#include "object.hpp"
-#include "stage.hpp"
+#include "Sonic.hpp"
 
 using namespace sonic;
+
+EXPORT_SONIC_OBJECT(Sonic)
 
 void Sonic::update(rt::Input const& input, Stage& stage) noexcept {
     using rt::Key;

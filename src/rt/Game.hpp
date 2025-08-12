@@ -174,7 +174,7 @@ namespace rt {
     class Input {
         std::optional<Mouse> mouse_state;
         std::unordered_set<KeyState> keys;
-        usize poll_counter;
+        usize poll_counter { 0 };
 
       protected:
         void press(Key key) {

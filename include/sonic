@@ -1,0 +1,8 @@
+#pragma once
+
+#include "../src/sonic/animator.hpp"
+#include "../src/sonic/dynobject.hpp"
+#include "../src/sonic/class_loader.hpp"
+#include "../src/sonic/object.hpp"
+#include "../src/sonic/scene.hpp"
+#include "../src/sonic/stage.hpp"

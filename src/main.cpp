@@ -22,7 +22,7 @@ class SonicGame final {
         this->angle_sheet = TgaImage::from(rt::load("res/angles.tga")) | draw::flatten<Image>();
         this->background = TgaImage::from(rt::load("res/background.tga")) | draw::flatten<Image>();
 
-        this->scene = sonic::Stage::load("res/1-1.stage", sonic::registry, height_arrays);
+        this->scene = sonic::Stage::load("res/1-1.stage", height_arrays);
     }
 
     void update(rt::Input const& input) {

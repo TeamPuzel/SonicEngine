@@ -1,7 +1,7 @@
 // Created by Lua (TeamPuzel) on May 26th 2025.
 // Copyright (c) 2025 All rights reserved.
 //
-// This is where the level magic happens.
+// This header defines everything about levels.
 #pragma once
 #include <primitive>
 #include <rt>
@@ -10,6 +10,7 @@
 #include <functional>
 #include "scene.hpp"
 #include "object.hpp"
+#include "class_loader.hpp"
 
 namespace sonic {
     struct DrawCommand {
@@ -18,10 +19,7 @@ namespace sonic {
         struct Tile final { i32 x, y; };
         struct Object final { std::reference_wrapper<const sonic::Object> ref; };
 
-        union {
-            Tile tile;
-            Object object;
-        };
+        union { Tile tile; Object object; };
     };
 
     struct Tile final {
@@ -106,6 +104,7 @@ namespace sonic {
         void update(rt::Input const& input) override {
             if (input.key_pressed(rt::Key::Num1)) visual_debug = !visual_debug;
             if (input.key_pressed(rt::Key::Num2)) movement_debug = !movement_debug;
+            if (input.key_pressed(rt::Key::R)) hot_reload();
 
             const auto [px, py] = primary->pixel_pos();
             constexpr i32 X_UPDATE_DISTANCE = 320 + 320 / 2;
@@ -452,7 +451,7 @@ namespace sonic {
         }
 
         [[clang::always_inline]] [[gnu::const]]
-        auto sense(Sonic const* relative_space, i32 x, i32 y, SensorDirection direction, Sonic::Mode mode) const -> SensorResult {
+        auto sense(Object const* relative_space, i32 x, i32 y, SensorDirection direction, Object::Mode mode) const -> SensorResult {
             const auto [rx, ry] = rotate(x, y, (i32) mode);
             return sense(relative_space, rx, ry, rotate(direction, (u32) mode));
         }
@@ -473,7 +472,7 @@ namespace sonic {
         }
 
         template <typename T>
-        void sense_draw(Sonic const* relative_space, i32 x, i32 y, SensorDirection direction, Sonic::Mode mode, T target, Color color) const {
+        void sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, Object::Mode mode, T target, Color color) const {
             static_assert(draw::MutablePlane<T>::value);
             const auto res = sense(relative_space, x, y, direction, mode);
 
@@ -490,11 +489,9 @@ namespace sonic {
 
         /// Loads a stage from a file using a provided object registry.
         /// Throws a runtime error if the registry doesn't recognize the object.
-        template <typename Reg> static auto load(
-            char const* filename, Reg const& registry, Ref<const Image> height_arrays
+        static auto load(
+            char const* filename, Ref<const Image> height_arrays
         ) -> Box<Stage> {
-            static_assert(ObjectRegistry<Reg>::value);
-
             auto ret = Box<Stage>::make(height_arrays);
 
             const auto data = rt::load(filename);
@@ -520,22 +517,17 @@ namespace sonic {
             for (u32 i = 0; i < object_count; i += 1) {
                 const std::string_view classname = reader.cstr(64);
 
-                const auto deserializer = registry(classname);
-                if (not deserializer) {
-                    std::stringstream msg;
-                    msg << "Attempted to deserialize a class not present in the provided registry: class "
-                        << classname;
-                    throw std::runtime_error(msg.str());
-                }
+                const auto descriptor = class_loader::load(classname);
 
                 const auto x = reader.i32();
                 const auto y = reader.i32();
 
                 const auto position = reader.position();
 
-                auto instance = deserializer(reader);
+                auto instance = descriptor.deserializer(reader);
                 instance->position = math::point<fixed> { x, y };
                 if (classname == "Sonic") ret->primary = instance.raw();
+                instance->classname = classname;
                 ret->objects.emplace_back(std::move(instance));
 
                 reader.seek(position + 1024);
@@ -543,28 +535,24 @@ namespace sonic {
 
             return ret;
         }
-    };
 
-    #ifdef __clang__
-    /// Rather than putting all the classes here we can introspect the binary itself and find the static method.
-    /// This code is sound when targeting the itanium ABI. The exception here is of course Windows.
-    ///
-    /// Why is this better?
-    ///
-    /// Well, we can use it to deserialize objects from shared libraries. Once there is a built-in level editor
-    /// It will be possible to hot reload classes on the fly.
-    static auto registry(std::string_view classname) -> Deserializer* {
-        std::stringstream mangled_name;
-        mangled_name << "_ZN5sonic" << classname.size() << classname << "11deserializeERN2rt12BinaryReaderE";
-        static auto self = rt::Object::open(nullptr);
-        return (Deserializer*) self.sym(mangled_name.str().c_str());
-    }
-    #else
-    /// Manual deserializer registry.
-    static auto registry(std::string_view classname) -> Deserializer* {
-        if (classname == "Ring")  return Ring::deserialize;
-        if (classname == "Sonic") return Sonic::deserialize;
-        return nullptr;
-    }
-    #endif
+      private:
+        [[gnu::cold]]
+        void hot_reload() {
+            class_loader::swap_registry();
+            for (Box<Object>& object : objects) {
+                if (not object->is_dynobject()) continue;
+
+                auto descriptor = class_loader::load(object->classname);
+                auto replacement = descriptor.rebuilder(*object);
+
+                replacement->position = object->position;
+                replacement->classname = object->classname;
+                if (object->classname == "Sonic") primary = replacement.raw();
+
+                std::swap(object, replacement);
+            }
+            class_loader::drop_old_object_classes();
+        }
+    };
 }
