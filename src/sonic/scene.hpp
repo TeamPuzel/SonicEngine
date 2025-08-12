@@ -25,5 +25,7 @@ namespace sonic {
             rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
         ) const = 0;
         virtual ~Scene() noexcept {}
+
+        virtual void hot_reload() {}
     };
 }

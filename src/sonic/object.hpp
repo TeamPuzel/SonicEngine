@@ -59,7 +59,7 @@ namespace sonic {
         auto operator=(Object const&) -> Object& = delete;
         auto operator=(Object&&) -> Object& = delete;
 
-        /// Called each tick at 60hz.
+        /// Called once every tick at 60hz.
         virtual void update(rt::Input const& input, Stage& stage) noexcept {}
 
         enum class Mode : u8 {
@@ -112,40 +112,4 @@ namespace sonic {
             // TODO: Serialize basics and classname.
         }
     };
-
-    /// A moving platform.
-    class Platform final : public Object {};
-
-    /// A cliff which collapses when touched.
-    class CollapsingCliff final : public Object {};
-
-    /// A breakable monitor providing power-ups.
-    class Monitor final : public Object {};
-
-    /// A goal sign present at the end of any non-final act.
-    class Goal final : public Object {};
-
-    /// A checkpoint gate.
-    class Checkpoint final : public Object {};
-
-    /// A spring launching the player in a direction.
-    class Spring final : public Object {};
-
-    /// A hostile entity launching up from water to try and bite the player.
-    class Chopper final : public Object {};
-
-    /// A basic hostile entity moving about the ground.
-    class MotoBug final : public Object {};
-
-    /// A hostile crab walking about and launching projectiles sometimes.
-    class Crabmeat final : public Object {};
-
-    /// A flying hostile entity and launching projectiles at the player.
-    class BuzzBomber final : public Object {};
-
-    class BlueNewtron final : public Object {};
-
-    class GreenNewtron final : public Object {};
-
-    class Animal final : public Object {};
 }

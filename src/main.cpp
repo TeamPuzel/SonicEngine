@@ -8,6 +8,15 @@
 using draw::Image;
 using draw::TgaImage;
 
+static std::atomic<bool> RELOAD_REQUESTED = false;
+
+#if defined(__APPLE__) || defined(__linux__)
+#include <signal.h>
+void reload_handler(i32 signal) {
+    if (signal == SIGUSR1) RELOAD_REQUESTED = true;
+}
+#endif
+
 class SonicGame final {
     Image sheet;
     Image height_arrays;
@@ -26,16 +35,27 @@ class SonicGame final {
     }
 
     void update(rt::Input const& input) {
+        if (RELOAD_REQUESTED) {
+            scene->hot_reload();
+            RELOAD_REQUESTED = false;
+        }
         scene->update(input);
     }
 
-    template <typename T> void draw(rt::Input const& input, T& target) const {
-        static_assert(draw::SizedPlane<T>::value and draw::MutablePlane<T>::value);
+    void draw(rt::Input const& input, draw::Image& target) const {
         scene->draw(input, target, sheet, background);
     }
 };
 
 auto main() -> i32 {
+    #if defined(__APPLE__) || defined(__linux__)
+    struct sigaction sa;
+    sa.sa_handler = reload_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART; // restart syscalls after signal
+    sigaction(SIGUSR1, &sa, NULL);
+    #endif
+
     SonicGame game;
     rt::run(game, "Sonic", 4);
 }

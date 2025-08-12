@@ -17,6 +17,7 @@ reload:
 	@rm -rf build/CMakeCache.txt
 	@cmake -B build -DCMAKE_BUILD_TYPE=Release -DHOT_RELOAD=ON -G Ninja
 	@cd build; ninja
+	@pkill -USR1 sonic
 
 run: build
 	@cd build; ./sonic

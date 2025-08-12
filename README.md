@@ -40,7 +40,7 @@ The controls can be operated in left handed and right handed modes:
 - (Debug) Press 8 to toggle the heuristic refresh rate lock.
 - (Debug) Press 9 to toggle the performance and refresh rate heuristic overlay.
 - (Debug) Press 0 to toggle vsync.
-- (Development) Press R to hot reload object classes.
+- (Development) Press R to hot reload object classes (Windows only, on UNIX a reload will automatically signal the binary)
 
 There were no other abilities in Sonic 1 yet.
 

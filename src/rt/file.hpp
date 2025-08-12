@@ -177,26 +177,26 @@ namespace rt {
         }
     };
 
-    class Object final {
+    class ClassLoader final {
         void* obj;
 
-        Object(void* obj) : obj(obj) {}
+        ClassLoader(void* obj) : obj(obj) {}
 
       public:
-        static auto open(char const *path) -> Object {
-            Object ret = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+        static auto open(char const *path) -> ClassLoader {
+            ClassLoader ret = dlopen(path, RTLD_NOW | RTLD_LOCAL);
             if (not ret.obj) throw std::runtime_error(dlerror());
             return ret;
         }
 
-        Object(Object const&) = delete;
-        auto operator=(Object const&) -> Object& = delete;
+        ClassLoader(ClassLoader const&) = delete;
+        auto operator=(ClassLoader const&) -> ClassLoader& = delete;
 
-        Object(Object&& other) noexcept : obj(other.obj) {
+        ClassLoader(ClassLoader&& other) noexcept : obj(other.obj) {
             other.obj = nullptr;
         }
 
-        auto operator=(Object&& other) noexcept -> Object& {
+        auto operator=(ClassLoader&& other) noexcept -> ClassLoader& {
             if (this != &other) {
                 if (obj) dlclose(obj);
                 obj = other.obj;
@@ -206,7 +206,7 @@ namespace rt {
         }
 
 
-        ~Object() noexcept {
+        ~ClassLoader() noexcept {
             if (obj) {
                 dlclose(obj);
                 obj = nullptr;

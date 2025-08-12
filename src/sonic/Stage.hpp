@@ -104,7 +104,9 @@ namespace sonic {
         void update(rt::Input const& input) override {
             if (input.key_pressed(rt::Key::Num1)) visual_debug = !visual_debug;
             if (input.key_pressed(rt::Key::Num2)) movement_debug = !movement_debug;
-            if (input.key_pressed(rt::Key::R)) hot_reload();
+
+            // On UNIX this is automatic and mapped to SIGUSR1, no need for a keybind.
+            // if (input.key_pressed(rt::Key::R)) hot_reload();
 
             const auto [px, py] = primary->pixel_pos();
             constexpr i32 X_UPDATE_DISTANCE = 320 + 320 / 2;
@@ -373,8 +375,7 @@ namespace sonic {
         /// At the end of the day objects just want the distance and they do not care if the entire range is consistent
         /// as they always considered only the consistent subrange within. I can't believe I spent days on
         /// this nonsense instead of just doing the obious thing.
-        [[gnu::const]]
-        auto sense(i32 x, i32 y, SensorDirection direction) const -> SensorResult {
+        [[gnu::const]] auto sense(i32 x, i32 y, SensorDirection direction) const -> SensorResult {
             i32 cx = x, cy = y;
 
             const i32 max_distance = 32;
@@ -488,10 +489,8 @@ namespace sonic {
         }
 
         /// Loads a stage from a file using a provided object registry.
-        /// Throws a runtime error if the registry doesn't recognize the object.
-        static auto load(
-            char const* filename, Ref<const Image> height_arrays
-        ) -> Box<Stage> {
+        /// Throws a runtime error if the object class does not exist.
+        static auto load(char const* filename, Ref<const Image> height_arrays) -> Box<Stage> {
             auto ret = Box<Stage>::make(height_arrays);
 
             const auto data = rt::load(filename);
@@ -536,9 +535,7 @@ namespace sonic {
             return ret;
         }
 
-      private:
-        [[gnu::cold]]
-        void hot_reload() {
+        [[gnu::cold]] void hot_reload() override {
             class_loader::swap_registry();
             for (Box<Object>& object : objects) {
                 if (not object->is_dynobject()) continue;

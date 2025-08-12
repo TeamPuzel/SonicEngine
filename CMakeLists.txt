@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_CXX_FLAGS
-    "-Wall -g -Wno-unused -Wpedantic -Wno-logical-op-parentheses"
+    "-Wall -g -Wno-unused -Wpedantic -Wno-logical-op-parentheses -flto"
 )
 set(CMAKE_CXX_FLAGS_DEBUG "-ftrivial-auto-var-init=pattern")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")

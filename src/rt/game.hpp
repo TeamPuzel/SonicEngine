@@ -31,6 +31,9 @@ namespace rt {
         Backslash, Equals, Dash, BracketLeft, BracketRight,
         Semicolon, Quote,
         Shift, Meta, Control, Option, Tab, Enter, Escape,
+
+        Plus = Equals,
+        Minus = Dash,
     };
 
     struct KeyIterator final {
@@ -444,7 +447,9 @@ namespace rt {
         }
         SDL_SetWindowMinimumSize(window, width, height);
         SDL_HideCursor();
+        #ifdef _WIN32
         SDL_SetWindowFullscreen(window, true);
+        #endif
         SDL_SyncWindow(window);
 
         // A simple SDL provided renderer.
@@ -504,22 +509,23 @@ namespace rt {
         auto input = rt::input();
         auto rate = rt::refresh_rate_lock();
 
+        const auto apply_window_size = [&] {
+            // We are explicitly using the scaled window size and not the
+            // GetWindowSizeInPixels(window:w:h:) call because we do actually want to scale
+            // our own pixel scale by the display scale.
+            // Effectively the game is always scaled twice on high density displays which will
+            // give consistent sizing between devices.
+            i32 w, h; SDL_GetWindowSize(window, &w, &h);
+            resize_texture(w / scale, h / scale);
+            target.resize(w / scale, h / scale);
+        };
+
         while (true) {
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {
-                    case SDL_EVENT_QUIT:
-                        goto end;
-                    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-                        // We are explicitly using the scaled window size and not the
-                        // GetWindowSizeInPixels(window:w:h:) call because we do actually want to scale
-                        // our own pixel scale by the display scale.
-                        i32 w, h;
-                        SDL_GetWindowSize(window, &w, &h);
-                        resize_texture(w / scale, h / scale);
-                        target.resize(w / scale, h / scale);
-                        break;
-                    default:
-                        break;
+                    case SDL_EVENT_QUIT: goto end;
+                    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: apply_window_size(); break;
+                    default: break;
                 }
             }
 
@@ -534,7 +540,8 @@ namespace rt {
                     << "Estimated rate: " << rate.estimated_hertz << std::endl
                     << "Average ms: " << rate.estimated_millis << std::endl
                     << "Vsync status: " << (is_vsync ? "Enabled" : "Disabled") << std::endl
-                    << "Heuristic lock status: " << (heuristic_rate_lock ? "Enabled" : "Disabled") << std::endl;
+                    << "Heuristic lock status: " << (heuristic_rate_lock ? "Enabled" : "Disabled") << std::endl
+                    << "Scale: " << scale << "x" << std::endl;
 
                 std::string line;
                 std::vector<std::pair<draw::Text<draw::Ref<const draw::Image>, std::string>, i32>> lines;
@@ -557,6 +564,12 @@ namespace rt {
                     }
                     if (input.key_pressed(Key::Num8)) heuristic_rate_lock = !heuristic_rate_lock;
                     if (input.key_pressed(Key::Num9)) perf_overlay = !perf_overlay;
+
+                    if (bool p = input.key_pressed(Key::Plus), m = input.key_pressed(Key::Minus); p or m) {
+                        if (p) scale = std::min(8, scale + 1);
+                        if (m) scale = std::max(1, scale - 1);
+                        apply_window_size();
+                    }
                 }
 
                 game.update(input);

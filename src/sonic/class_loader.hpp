@@ -8,8 +8,8 @@
 
 namespace sonic::class_loader {
     static bool SWAPPED_REGISTRY = false;
-    static std::unordered_map<std::string, rt::Object> REGISTRY_0;
-    static std::unordered_map<std::string, rt::Object> REGISTRY_1;
+    static std::unordered_map<std::string, rt::ClassLoader> REGISTRY_0;
+    static std::unordered_map<std::string, rt::ClassLoader> REGISTRY_1;
 
     struct DynamicObjectDescriptor final {
         ObjectRebuilder rebuilder;
@@ -31,7 +31,7 @@ namespace sonic::class_loader {
         Stub<ObjectSerializer> serializer { nullptr };
         Stub<ObjectDeserializer> deserializer { nullptr };
 
-        const auto fill = [&] (rt::Object const& obj) {
+        const auto fill = [&] (rt::ClassLoader const& obj) {
             rebuilder = (decltype(rebuilder)) obj.sym("__sonic_object_rebuild");
             serializer = (decltype(serializer)) obj.sym("__sonic_object_serialize");
             deserializer = (decltype(deserializer)) obj.sym("__sonic_object_deserialize");
@@ -40,7 +40,7 @@ namespace sonic::class_loader {
         if (const auto it = reg.find(library_path.str()); it != reg.end()) {
             fill(it->second);
         } else {
-            auto obj = rt::Object::open(library_path.str().c_str());
+            auto obj = rt::ClassLoader::open(library_path.str().c_str());
             fill(obj);
             reg.emplace(library_path.str(), std::move(obj));
         }
