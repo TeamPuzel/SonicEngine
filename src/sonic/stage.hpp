@@ -308,6 +308,9 @@ namespace sonic {
                 }
             }
 
+            // Request the primary to draw the hud.
+            primary->hud_draw(target, *this);
+
             // If the debug visuals are enabled draw them as well.
             if (visual_debug) {
                 std::stringstream out;
@@ -493,7 +496,7 @@ namespace sonic {
         static auto load(char const* filename, Ref<const Image> height_arrays) -> Box<Stage> {
             auto ret = Box<Stage>::make(height_arrays);
 
-            const auto data = rt::load(filename);
+            const auto data = rt::io::load(filename);
             auto reader = rt::BinaryReader::of(data);
 
             ret->width = reader.u32();

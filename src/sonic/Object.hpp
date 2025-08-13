@@ -93,6 +93,10 @@ namespace sonic {
             return false;
         }
 
+        /// Called on the primary, meant for drawing the object specific UI.
+        /// The object receives the screen slice to draw into freely.
+        virtual void hud_draw(Ref<Image> target, Stage const& stage) const noexcept {}
+
         /// Called when debug drawing is enabled, meant for visualising collision etc.
         /// The object receives the global debug overlay output and the camera slice to draw into freely.
         virtual void debug_draw(std::stringstream& out, draw::Slice<Ref<Image>> target, Stage const& stage) const noexcept {}

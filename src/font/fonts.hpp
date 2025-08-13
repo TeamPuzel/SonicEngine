@@ -2,7 +2,7 @@
 // Copyright (c) 2025 All rights reserved.
 #pragma once
 #include <draw>
-#include "../rt/file.hpp"
+#include "../rt/io.hpp" // Precise include to avoid circular dependency, wonderful language.
 
 namespace font {
     using draw::Font;
@@ -10,11 +10,82 @@ namespace font {
     using draw::Image;
     using draw::Ref;
 
+    inline auto sonic() -> Font<Ref<const Image>, char> const& {
+        using Inner = Ref<const Image>;
+        using Symbol = draw::Symbol<Inner>;
+
+        static auto sonicfont = TgaImage::from(rt::io::load("res/sonicfont.tga"))
+            | draw::flatten<Image>();
+
+        static Font<Ref<const Image>, char> font = {
+            sonicfont, // source
+            10, // height
+            0, // baseline
+            2, // spacing
+            1, // leading
+            [] (Ref<const Image> const& src, char c) -> Symbol {
+                const auto grid = src | draw::grid(9, 10);
+
+                switch (c) {
+                    case ' ': return Symbol::Space { 5 };
+
+                    case 'A': case 'a': return grid.tile(1,  0).resize_right(-3);
+                    case 'B': case 'b': return grid.tile(2,  0).resize_right(-3);
+                    case 'C': case 'c': return grid.tile(3,  0).resize_right(-3);
+                    case 'D': case 'd': return grid.tile(4,  0).resize_right(-3);
+                    case 'E': case 'e': return grid.tile(5,  0).resize_right(-3);
+                    case 'F': case 'f': return grid.tile(6,  0).resize_right(-3);
+                    case 'G': case 'g': return grid.tile(7,  0).resize_right(-3);
+                    case 'H': case 'h': return grid.tile(8,  0).resize_right(-3);
+                    case 'I': case 'i': return grid.tile(9,  0).resize_right(-7);
+                    case 'J': case 'j': return grid.tile(10, 0).resize_right(-3);
+                    case 'K': case 'k': return grid.tile(11, 0).resize_right(-2);
+                    case 'L': case 'l': return grid.tile(12, 0).resize_right(-4);
+                    case 'M': case 'm': return grid.tile(13, 0);
+                    case 'N': case 'n': return grid.tile(14, 0).resize_right(-1);
+                    case 'O': case 'o': return grid.tile(15, 0).resize_right(-3);
+                    case 'P': case 'p': return grid.tile(16, 0).resize_right(-3);
+                    case 'Q': case 'q': return grid.tile(17, 0).resize_right(-3);
+                    case 'R': case 'r': return grid.tile(18, 0).resize_right(-3);
+                    case 'S': case 's': return grid.tile(19, 0).resize_right(-3);
+                    case 'T': case 't': return grid.tile(20, 0).resize_right(-3);
+                    case 'U': case 'u': return grid.tile(21, 0).resize_right(-3);
+                    case 'V': case 'v': return grid.tile(22, 0).resize_right(-3);
+                    case 'W': case 'w': return grid.tile(23, 0);
+                    case 'X': case 'x': return grid.tile(24, 0).resize_right(-2);
+                    case 'Y': case 'y': return grid.tile(25, 0).resize_right(-3);
+                    case 'Z': case 'z': return grid.tile(26, 0).resize_right(-2);
+
+                    case '0': return grid.tile(27, 0).resize_right(-3);
+                    case '1': return grid.tile(28, 0).resize_right(-6);
+                    case '2': return grid.tile(29, 0).resize_right(-3);
+                    case '3': return grid.tile(30, 0).resize_right(-3);
+                    case '4': return grid.tile(31, 0).resize_right(-3);
+                    case '5': return grid.tile(32, 0).resize_right(-3);
+                    case '6': return grid.tile(33, 0).resize_right(-3);
+                    case '7': return grid.tile(34, 0).resize_right(-2);
+                    case '8': return grid.tile(35, 0).resize_right(-3);
+                    case '9': return grid.tile(36, 0).resize_right(-3);
+
+                    case ':': return grid.tile(37, 0).resize_right(-7);
+                    case ';': return grid.tile(38, 0).resize_right(-7);
+
+                    case '.': return grid.tile(39, 0).resize_right(-7);
+                    case ',': return grid.tile(40, 0).resize_right(-7);
+
+                    default: return grid.tile(0, 0).resize_right(-3);
+                }
+            },
+        };
+
+        return font;
+    }
+
     inline auto pico() -> Font<Ref<const Image>, char> const& {
         using Inner = Ref<const Image>;
         using Symbol = draw::Symbol<Inner>;
 
-        static auto minefont = TgaImage::from(rt::load("res/picofont.tga"))
+        static auto minefont = TgaImage::from(rt::io::load("res/picofont.tga"))
             | draw::flatten<Image>();
 
         static Font<Ref<const Image>, char> font = {
@@ -111,7 +182,7 @@ namespace font {
         using Inner = Ref<const Image>;
         using Symbol = draw::Symbol<Inner>;
 
-        static auto minefont = TgaImage::from(rt::load("res/minefont.tga"))
+        static auto minefont = TgaImage::from(rt::io::load("res/minefont.tga"))
             | draw::flatten<Image>();
 
         static Font<Ref<const Image>, char> font = {
@@ -265,7 +336,7 @@ namespace font {
         using Inner = Ref<const Image>;
         using Symbol = draw::Symbol<Inner>;
 
-        static auto minefont = TgaImage::from(rt::load("res/minefont.tga"))
+        static auto minefont = TgaImage::from(rt::io::load("res/minefont.tga"))
             | draw::flatten<Image>();
 
         static Font<Ref<const Image>, char16> font = {

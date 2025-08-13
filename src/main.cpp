@@ -26,10 +26,10 @@ class SonicGame final {
 
   public:
     SonicGame() {
-        this->sheet = TgaImage::from(rt::load("res/tilemap.tga")) | draw::flatten<Image>();
-        this->height_arrays = TgaImage::from(rt::load("res/collision.tga")) | draw::flatten<Image>();
-        this->angle_sheet = TgaImage::from(rt::load("res/angles.tga")) | draw::flatten<Image>();
-        this->background = TgaImage::from(rt::load("res/background.tga")) | draw::flatten<Image>();
+        this->sheet = TgaImage::from(rt::io::load("res/tilemap.tga")) | draw::flatten<Image>();
+        this->height_arrays = TgaImage::from(rt::io::load("res/collision.tga")) | draw::flatten<Image>();
+        this->angle_sheet = TgaImage::from(rt::io::load("res/angles.tga")) | draw::flatten<Image>();
+        this->background = TgaImage::from(rt::io::load("res/background.tga")) | draw::flatten<Image>();
 
         this->scene = sonic::Stage::load("res/1-1.stage", height_arrays);
     }

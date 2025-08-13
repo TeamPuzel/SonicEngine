@@ -5,34 +5,8 @@
 #pragma once
 #include <primitive>
 #include <vector>
-#include <fstream>
-#include <dlfcn.h>
 
 namespace rt {
-    /// Loads the entirety of a file into program memory.
-    /// Prioritizes simplicity since there is no need to interface with the OS.
-    static auto load(char const* filename) -> std::vector<u8> {
-        // Open the file in binary mode and move the cursor to the end.
-        std::ifstream file(filename, std::ios::binary | std::ios::ate);
-        if (not file.is_open())
-            throw std::runtime_error("Could not open file");
-
-        // Get the file size.
-        std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        // Allocate a buffer.
-        std::vector<u8> buffer;
-        buffer.resize(size);
-
-        // Read the file data into the buffer.
-        if (not file.read(reinterpret_cast<char*>(buffer.data()), size))
-            throw std::runtime_error("Could not read file");
-
-        file.close();
-        return buffer;
-    }
-
     class BinaryWriter final {};
 
     /// A sound implementation of a binary data reader for serialization purposes.
@@ -174,49 +148,6 @@ namespace rt {
         /// Skips over the given number of bytes.
         void skip(usize count) noexcept {
             this->cursor += count;
-        }
-    };
-
-    class ClassLoader final {
-        void* obj;
-
-        ClassLoader(void* obj) : obj(obj) {}
-
-      public:
-        static auto open(char const *path) -> ClassLoader {
-            ClassLoader ret = dlopen(path, RTLD_NOW | RTLD_LOCAL);
-            if (not ret.obj) throw std::runtime_error(dlerror());
-            return ret;
-        }
-
-        ClassLoader(ClassLoader const&) = delete;
-        auto operator=(ClassLoader const&) -> ClassLoader& = delete;
-
-        ClassLoader(ClassLoader&& other) noexcept : obj(other.obj) {
-            other.obj = nullptr;
-        }
-
-        auto operator=(ClassLoader&& other) noexcept -> ClassLoader& {
-            if (this != &other) {
-                if (obj) dlclose(obj);
-                obj = other.obj;
-                other.obj = nullptr;
-            }
-            return *this;
-        }
-
-
-        ~ClassLoader() noexcept {
-            if (obj) {
-                dlclose(obj);
-                obj = nullptr;
-            }
-        }
-
-        auto sym(char const* name) const -> void* {
-            auto ret = dlsym(obj, name);
-            if (not ret) throw std::runtime_error(dlerror());
-            return ret;
         }
     };
 }

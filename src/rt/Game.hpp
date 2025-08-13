@@ -14,7 +14,7 @@
 #include <iostream>
 #include <chrono>
 #include <numeric>
-#include <SDL3/SDL.h>
+#include "io.hpp"
 
 namespace rt {
     struct Mouse final {
