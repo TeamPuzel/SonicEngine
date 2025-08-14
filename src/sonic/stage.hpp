@@ -101,7 +101,7 @@ namespace sonic {
 
         Stage(Ref<const Image> height_tiles) : height_tiles(height_tiles) {}
 
-        void update(rt::Input const& input) override {
+        void update(Io& io, rt::Input const& input) override {
             if (input.key_pressed(rt::Key::Num1)) visual_debug = !visual_debug;
             if (input.key_pressed(rt::Key::Num2)) movement_debug = !movement_debug;
 
@@ -128,7 +128,7 @@ namespace sonic {
         /// We receive three things, an inout mutable image representing the screen to render into,
         /// another image which is the sprite sheet and one to slice the background from.
         [[gnu::hot]] void draw(
-            rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
+            Io& io, rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
         ) const override {
             // We will first assemble a buffer of draw commands, this way we can easily sort before rendering later.
             std::vector<DrawCommand> commands;
@@ -309,7 +309,7 @@ namespace sonic {
             }
 
             // Request the primary to draw the hud.
-            primary->hud_draw(target, *this);
+            primary->hud_draw(io, target, *this);
 
             // If the debug visuals are enabled draw them as well.
             if (visual_debug) {
@@ -338,7 +338,7 @@ namespace sonic {
                             if (not tile.flag) angle_out << (u32) tile.angle; else angle_out << "flg";
 
                             camera_target | draw::draw(
-                                Text(angle_out.str(), font::pico()),
+                                Text(angle_out.str(), font::pico(io)),
                                 command.tile.x * 16, command.tile.y * 16
                             );
                         }
@@ -350,8 +350,8 @@ namespace sonic {
                 }
 
                 std::string line;
-                for (i32 y = 8; std::getline(out, line); y += font::mine().height + font::mine().leading) {
-                    target | draw::draw(Text(line, font::mine()), 8, y);
+                for (i32 y = 8; std::getline(out, line); y += font::mine(io).height + font::mine(io).leading) {
+                    target | draw::draw(Text(line, font::mine(io)), 8, y);
                 }
             }
         }
@@ -493,10 +493,10 @@ namespace sonic {
 
         /// Loads a stage from a file using a provided object registry.
         /// Throws a runtime error if the object class does not exist.
-        static auto load(char const* filename, Ref<const Image> height_arrays) -> Box<Stage> {
+        static auto load(Io& io, std::string_view filename, Ref<const Image> height_arrays) -> Box<Stage> {
             auto ret = Box<Stage>::make(height_arrays);
 
-            const auto data = rt::io::load(filename);
+            const auto data = io.read_file(filename);
             auto reader = rt::BinaryReader::of(data);
 
             ret->width = reader.u32();
@@ -519,7 +519,7 @@ namespace sonic {
             for (u32 i = 0; i < object_count; i += 1) {
                 const std::string_view classname = reader.cstr(64);
 
-                const auto descriptor = class_loader::load(classname);
+                const auto descriptor = class_loader::load(io, classname);
 
                 const auto x = reader.i32();
                 const auto y = reader.i32();
@@ -538,12 +538,12 @@ namespace sonic {
             return ret;
         }
 
-        [[gnu::cold]] void hot_reload() override {
+        [[gnu::cold]] void hot_reload(Io& io) override {
             class_loader::swap_registry();
             for (Box<Object>& object : objects) {
                 if (not object->is_dynobject()) continue;
 
-                auto descriptor = class_loader::load(object->classname);
+                auto descriptor = class_loader::load(io, object->classname);
                 auto replacement = descriptor.rebuilder(*object);
 
                 replacement->position = object->position;
@@ -553,6 +553,12 @@ namespace sonic {
                 std::swap(object, replacement);
             }
             class_loader::drop_old_object_classes();
+        }
+
+        ~Stage() noexcept {
+            /// Make sure that we no longer hold on to objects, we can't destroy them after clearing the class loader.
+            objects.clear();
+            class_loader::clear();
         }
     };
 }

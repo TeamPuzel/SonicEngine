@@ -6,6 +6,7 @@
 #pragma once
 #include <primitive>
 #include <string_view>
+#include <optional>
 #include "color.hpp"
 #include "plane.hpp"
 #include "image.hpp"

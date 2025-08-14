@@ -4,12 +4,13 @@
 // A dynamic class loader for very late binding of game objects.
 #pragma once
 #include <rt>
+#include <unordered_map>
 #include "dynobject.hpp"
 
 namespace sonic::class_loader {
     static bool SWAPPED_REGISTRY = false;
-    static std::unordered_map<std::string, rt::io::DynamicLibrary> REGISTRY_0;
-    static std::unordered_map<std::string, rt::io::DynamicLibrary> REGISTRY_1;
+    static std::unordered_map<std::string, Io::DynamicLibrary> REGISTRY_0;
+    static std::unordered_map<std::string, Io::DynamicLibrary> REGISTRY_1;
 
     struct DynamicObjectDescriptor final {
         ObjectRebuilder rebuilder;
@@ -21,7 +22,7 @@ namespace sonic::class_loader {
 
     /// We can use this to load objects from shared libraries. Once there is a built-in level editor
     /// It will be possible to hot reload classes on the fly very conveniently.
-    static auto load(std::string_view classname) -> DynamicObjectDescriptor {
+    static auto load(Io& io, std::string_view classname) -> DynamicObjectDescriptor {
         auto& reg = SWAPPED_REGISTRY ? REGISTRY_0 : REGISTRY_1;
 
         std::stringstream library_path;
@@ -31,16 +32,16 @@ namespace sonic::class_loader {
         Stub<ObjectSerializer> serializer { nullptr };
         Stub<ObjectDeserializer> deserializer { nullptr };
 
-        const auto fill = [&] (rt::io::DynamicLibrary const& obj) {
-            rebuilder = (decltype(rebuilder)) obj.sym("__sonic_object_rebuild");
-            serializer = (decltype(serializer)) obj.sym("__sonic_object_serialize");
-            deserializer = (decltype(deserializer)) obj.sym("__sonic_object_deserialize");
+        const auto fill = [&] (Io::DynamicLibrary const& obj) {
+            rebuilder = (decltype(rebuilder)) obj.symbol("__sonic_object_rebuild");
+            serializer = (decltype(serializer)) obj.symbol("__sonic_object_serialize");
+            deserializer = (decltype(deserializer)) obj.symbol("__sonic_object_deserialize");
         };
 
         if (const auto it = reg.find(library_path.str()); it != reg.end()) {
             fill(it->second);
         } else {
-            auto obj = rt::io::DynamicLibrary::open(library_path.str().c_str());
+            auto obj = io.open_library(library_path.str());
             fill(obj);
             reg.emplace(library_path.str(), std::move(obj));
         }
@@ -57,5 +58,10 @@ namespace sonic::class_loader {
     static void drop_old_object_classes() {
         auto& reg = SWAPPED_REGISTRY ? REGISTRY_1 : REGISTRY_0;
         reg.clear();
+    }
+
+    static void clear() {
+        REGISTRY_0.clear();
+        REGISTRY_1.clear();
     }
 }

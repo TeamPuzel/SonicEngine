@@ -24,7 +24,7 @@ using i8 = signed char;
 using i16 = signed short;
 using i32 = signed int;
 
-#ifdef OS_WINDOWS
+#ifdef _MSC_VER
 using u64 = unsigned long long;
 using i64 = signed long long;
 #else

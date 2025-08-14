@@ -2,7 +2,7 @@
 // Copyright (c) 2025 All rights reserved.
 #pragma once
 #include <draw>
-#include "../rt/io.hpp" // Precise include to avoid circular dependency, wonderful language.
+#include <io>
 
 namespace font {
     using draw::Font;
@@ -10,11 +10,11 @@ namespace font {
     using draw::Image;
     using draw::Ref;
 
-    inline auto sonic() -> Font<Ref<const Image>, char> const& {
+    inline auto sonic(Io& io) -> Font<Ref<const Image>, char> const& {
         using Inner = Ref<const Image>;
         using Symbol = draw::Symbol<Inner>;
 
-        static auto sonicfont = TgaImage::from(rt::io::load("res/sonicfont.tga"))
+        static auto sonicfont = TgaImage::from(io.read_file("res/sonicfont.tga"))
             | draw::flatten<Image>();
 
         static Font<Ref<const Image>, char> font = {
@@ -81,11 +81,11 @@ namespace font {
         return font;
     }
 
-    inline auto pico() -> Font<Ref<const Image>, char> const& {
+    inline auto pico(Io& io) -> Font<Ref<const Image>, char> const& {
         using Inner = Ref<const Image>;
         using Symbol = draw::Symbol<Inner>;
 
-        static auto minefont = TgaImage::from(rt::io::load("res/picofont.tga"))
+        static auto minefont = TgaImage::from(io.read_file("res/picofont.tga"))
             | draw::flatten<Image>();
 
         static Font<Ref<const Image>, char> font = {
@@ -178,11 +178,11 @@ namespace font {
         return font;
     }
 
-    inline auto mine() -> Font<Ref<const Image>, char> const& {
+    inline auto mine(Io& io) -> Font<Ref<const Image>, char> const& {
         using Inner = Ref<const Image>;
         using Symbol = draw::Symbol<Inner>;
 
-        static auto minefont = TgaImage::from(rt::io::load("res/minefont.tga"))
+        static auto minefont = TgaImage::from(io.read_file("res/minefont.tga"))
             | draw::flatten<Image>();
 
         static Font<Ref<const Image>, char> font = {
@@ -332,11 +332,11 @@ namespace font {
         return font;
     }
 
-    inline auto mine_u16() -> Font<Ref<const Image>, char16> const& {
+    inline auto mine_u16(Io& io) -> Font<Ref<const Image>, char16> const& {
         using Inner = Ref<const Image>;
         using Symbol = draw::Symbol<Inner>;
 
-        static auto minefont = TgaImage::from(rt::io::load("res/minefont.tga"))
+        static auto minefont = TgaImage::from(io.read_file("res/minefont.tga"))
             | draw::flatten<Image>();
 
         static Font<Ref<const Image>, char16> font = {

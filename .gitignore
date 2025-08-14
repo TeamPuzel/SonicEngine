@@ -1,4 +1,5 @@
 build
+build-cross
 cmake-build-release
 cmake-build-debug
 .DS_Store

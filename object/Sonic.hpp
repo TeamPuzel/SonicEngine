@@ -386,7 +386,7 @@ namespace sonic {
             return Sprite { anim_x + (i32) animator.at(), anim_y, 64, 64, mirror_x, false, (u8) ground_sensor_mode() };
         }
 
-        void hud_draw(Ref<Image> target, Stage const& stage) const noexcept override {
+        void hud_draw(Io& io, Ref<Image> target, Stage const& stage) const noexcept override {
             std::stringstream hud_string;
             hud_string
                 << "SCORE  " << score << std::endl
@@ -396,11 +396,11 @@ namespace sonic {
             constexpr Color HUD_YELLOW = Color::rgba(255, 255, 10);
 
             std::string line;
-            for (i32 y = 8; std::getline(hud_string, line); y += font::mine().height + 5) {
+            for (i32 y = 8; std::getline(hud_string, line); y += font::mine(io).height + 5) {
                 target
-                    | draw::draw(Text(line, font::sonic(), draw::color::BLACK), 8 + 1, y + 1)
-                    | draw::draw(Text(line, font::sonic(), draw::color::BLACK), 8 + 1, y)
-                    | draw::draw(Text(line, font::sonic(), HUD_YELLOW), 8, y);
+                    | draw::draw(Text(line, font::sonic(io), draw::color::BLACK), 8 + 1, y + 1)
+                    | draw::draw(Text(line, font::sonic(io), draw::color::BLACK), 8 + 1, y)
+                    | draw::draw(Text(line, font::sonic(io), HUD_YELLOW), 8, y);
             }
         }
 

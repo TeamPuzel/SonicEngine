@@ -25,25 +25,26 @@ class SonicGame final {
     Box<sonic::Scene> scene;
 
   public:
-    SonicGame() {
-        this->sheet = TgaImage::from(rt::io::load("res/tilemap.tga")) | draw::flatten<Image>();
-        this->height_arrays = TgaImage::from(rt::io::load("res/collision.tga")) | draw::flatten<Image>();
-        this->angle_sheet = TgaImage::from(rt::io::load("res/angles.tga")) | draw::flatten<Image>();
-        this->background = TgaImage::from(rt::io::load("res/background.tga")) | draw::flatten<Image>();
+    SonicGame() {}
 
-        this->scene = sonic::Stage::load("res/1-1.stage", height_arrays);
+    void init(Io& io) {
+        sheet         = TgaImage::from(io.read_file("res/tilemap.tga")) | draw::flatten<Image>();
+        height_arrays = TgaImage::from(io.read_file("res/collision.tga")) | draw::flatten<Image>();
+        angle_sheet   = TgaImage::from(io.read_file("res/angles.tga")) | draw::flatten<Image>();
+        background    = TgaImage::from(io.read_file("res/background.tga")) | draw::flatten<Image>();
+        scene = sonic::Stage::load(io, "res/1-1.stage", height_arrays);
     }
 
-    void update(rt::Input const& input) {
+    void update(Io& io, rt::Input const& input) {
         if (RELOAD_REQUESTED) {
-            scene->hot_reload();
+            scene->hot_reload(io);
             RELOAD_REQUESTED = false;
         }
-        scene->update(input);
+        scene->update(io, input);
     }
 
-    void draw(rt::Input const& input, draw::Image& target) const {
-        scene->draw(input, target, sheet, background);
+    void draw(Io& io, rt::Input const& input, draw::Image& target) const {
+        scene->draw(io, input, target, sheet, background);
     }
 };
 
@@ -57,5 +58,5 @@ auto main() -> i32 {
     #endif
 
     SonicGame game;
-    rt::run(game, "Sonic", 4);
+    rt::run(game, "Sonic", 3, 960, 672); // Let's default to a scale and window size matching the original game resolution.
 }

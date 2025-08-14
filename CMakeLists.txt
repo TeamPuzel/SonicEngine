@@ -1,14 +1,24 @@
 cmake_minimum_required(VERSION 3.21)
-project(Sonic CXX)
+project(Sonic C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_FLAGS
-    "-Wall -g -Wno-unused -Wpedantic -Wno-logical-op-parentheses -flto"
-)
-set(CMAKE_CXX_FLAGS_DEBUG "-ftrivial-auto-var-init=pattern")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+# I won't really bother to configure MSVC. If one wishes to compile with that sad compiler I suppose
+# just not setting these flags should be enough.
+if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -Wno-unused -Wpedantic -Wno-logical-op-parentheses")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftrivial-auto-var-init=pattern")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+endif()
+
+# Use the bundled SDL when building for Windows.
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    set(SDL3_DIR "windows/SDL3-3.2.20/cmake")
+    file(COPY "windows/SDL3-3.2.20/lib/x64/SDL3.dll" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
+endif()
 
 find_package(SDL3 REQUIRED)
 

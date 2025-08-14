@@ -19,13 +19,13 @@ namespace sonic {
     /// significantly faster for obvous reasons and we control the runtime and can ensure it is one.
     struct Scene {
         /// Advances the state by 1/60 of a second.
-        virtual void update(rt::Input const& input) = 0;
+        virtual void update(Io& io, rt::Input const& input) = 0;
         /// Called after update to mutate the render target.
         virtual void draw(
-            rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
+            Io& io, rt::Input const& input, Ref<Image> target, Ref<const Image> sheet, Ref<const Image> background
         ) const = 0;
         virtual ~Scene() noexcept {}
 
-        virtual void hot_reload() {}
+        virtual void hot_reload(Io& io) {}
     };
 }

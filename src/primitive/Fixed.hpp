@@ -12,7 +12,7 @@
 
 // Workarounds for the awful version of C++ I have to use, C++17.
 namespace trash {
-    #ifdef _MSC_VER
+    #if defined(_MSC_VER) && !CROSS_COMPILING // We do not actually want to use this branch when using Clang after all.
     /// MSVC does not have a convenient builtin but it has botched semantics.
     ///
     /// From stack overflow:

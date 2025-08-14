@@ -6,20 +6,29 @@
 #include <rt>
 #include <type_traits>
 
+#if defined(_MSC_VER)
+#define DLLEXPORT __declspec(dllexport)
+#else
+#define DLL_EXPORT
+#endif
+
 // A type-safe and cross-platform object exporter.
 // This is not for use in headers but rather the object entry point to expose it
 // from the shared object file.
 #define EXPORT_SONIC_OBJECT(CLASSNAME)                       \
 static_assert(DynamicObject<CLASSNAME>::value);              \
-extern "C" ObjectRebuilder __sonic_object_rebuild() {        \
+extern "C" DLLEXPORT ObjectRebuilder __sonic_object_rebuild() {        \
     return (ObjectRebuilder) &CLASSNAME::rebuild;            \
 }                                                            \
-extern "C" ObjectSerializer __sonic_object_serialize() {     \
-    return (ObjectSerializer) &CLASSNAME::serialize;         \
+extern "C" DLLEXPORT ObjectSerializer __sonic_object_serialize() {     \
+    return nullptr;                                          \
 }                                                            \
-extern "C" ObjectDeserializer __sonic_object_deserialize() { \
+extern "C" DLLEXPORT ObjectDeserializer __sonic_object_deserialize() { \
     return (ObjectDeserializer) &CLASSNAME::deserialize;     \
 }
+#define OBJECT_REBUILD "__sonic_object_rebuild"
+#define OBJECT_SERIALIZE "__sonic_object_serialize"
+#define OBJECT_DESERIALIZE "__sonic_object_deserialize"
 
 namespace sonic {
     class Object;
@@ -29,7 +38,7 @@ namespace sonic {
     ///
     /// trait SerializableObject {
     ///     static rebuild(Self const*);
-    ///     static serialize(Self const&, BinaryWriter&);
+    ///     serialize(BinaryWriter&) const;
     ///     static deserialize(BinaryReader&) -> Self;
     /// }
     template <typename, typename = void> struct DynamicObject : std::false_type {};
@@ -41,5 +50,5 @@ namespace sonic {
 
     using ObjectRebuilder    = auto (*) (Object const&) -> Box<Object>;
     using ObjectDeserializer = auto (*) (rt::BinaryReader&) -> Box<Object>;
-    using ObjectSerializer   = auto (Object::*const) (rt::BinaryWriter&) -> void;
+    using ObjectSerializer   = auto (Object::*) (rt::BinaryWriter&) const -> void;
 }

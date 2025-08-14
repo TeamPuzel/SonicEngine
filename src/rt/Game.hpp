@@ -3,9 +3,11 @@
 //
 // The game header defines the traits of a game and provides a default game executor.
 #pragma once
+#include <SDL3/SDL_scancode.h>
 #include <primitive>
 #include <draw>
 #include <font>
+#include <io>
 #include <sstream>
 #include <string>
 #include <optional>
@@ -14,7 +16,45 @@
 #include <iostream>
 #include <chrono>
 #include <numeric>
-#include "io.hpp"
+#include <SDL3/SDL.h>
+
+/// An implemenation of Io purely in terms of SDL3. This is very convenient because we don't need
+/// to depend on the standard library or the operating system in SDL3 based projects.
+class SdlIo final : public Io {
+    class Error final : public Io::Error {
+        std::string reason { SDL_GetError() };
+      public:
+        Error() {}
+    };
+
+    auto perform_read_file(char const* path) -> std::vector<u8> override {
+        usize count;
+        const auto data = (u8*) SDL_LoadFile(path, &count);
+        auto ret = std::vector(data, data + count);
+        SDL_free(data);
+        return ret;
+    }
+
+    /// A dynamic library loader in terms of SDL3.
+    /// It offers little control but it happens to make the sensible choice of RTLD_NOW | RTLD_LOCAL which is
+    /// exactly what we want and I will assume the semantics are preserved on other platforms or this would be a sad API.
+    auto perform_open_library(char const* path) -> void* override {
+        auto ret = SDL_LoadObject(path);
+        if (not ret) throw Error();
+        return ret;
+    }
+
+    void perform_close_library(void* library) override {
+        SDL_UnloadObject((SDL_SharedObject*) library);
+    }
+
+    auto perform_load_symbol(void* library, char const* name) -> void* override {
+        auto ret = SDL_LoadFunction((SDL_SharedObject*) library, name);
+        if (not ret) throw Error();
+        return (void*) ret;
+    }
+};
+
 
 namespace rt {
     struct Mouse final {
@@ -31,6 +71,7 @@ namespace rt {
         Backslash, Equals, Dash, BracketLeft, BracketRight,
         Semicolon, Quote,
         Shift, Meta, Control, Option, Tab, Enter, Escape,
+        F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
 
         Plus = Equals,
         Minus = Dash,
@@ -169,6 +210,19 @@ namespace rt::detail {
             case Key::Tab:          return keys[SDL_SCANCODE_TAB];
             case Key::Enter:        return keys[SDL_SCANCODE_RETURN];
             case Key::Escape:       return keys[SDL_SCANCODE_ESCAPE];
+
+            case Key::F1:  return keys[SDL_SCANCODE_F1];
+            case Key::F2:  return keys[SDL_SCANCODE_F2];
+            case Key::F3:  return keys[SDL_SCANCODE_F3];
+            case Key::F4:  return keys[SDL_SCANCODE_F4];
+            case Key::F5:  return keys[SDL_SCANCODE_F5];
+            case Key::F6:  return keys[SDL_SCANCODE_F6];
+            case Key::F7:  return keys[SDL_SCANCODE_F7];
+            case Key::F8:  return keys[SDL_SCANCODE_F8];
+            case Key::F9:  return keys[SDL_SCANCODE_F9];
+            case Key::F10: return keys[SDL_SCANCODE_F10];
+            case Key::F11: return keys[SDL_SCANCODE_F11];
+            case Key::F12: return keys[SDL_SCANCODE_F12];
         }
     }
 }
@@ -392,8 +446,9 @@ namespace rt {
     template <typename, typename = draw::Image, typename = void> struct Game : std::false_type {};
     template <typename Self, typename Target> struct Game<Self, Target, std::enable_if_t<
         draw::SizedPlane<Target>::value and draw::MutablePlane<Target>::value and
-        std::is_same<decltype(std::declval<Self&>().update(std::declval<Input const&>())), void>::value and
-        std::is_same<decltype(std::declval<Self const&>().draw(std::declval<Input const&>(), std::declval<Target&>())), void>::value
+        std::is_same<decltype(std::declval<Self&>().init(std::declval<Io&>())), void>::value and
+        std::is_same<decltype(std::declval<Self&>().update(std::declval<Io&>(), std::declval<Input const&>())), void>::value and
+        std::is_same<decltype(std::declval<Self const&>().draw(std::declval<Io&>(), std::declval<Input const&>(), std::declval<Target&>())), void>::value
     >> : std::true_type {};
 
     /// An error raised while running the game using the default executor.
@@ -447,9 +502,6 @@ namespace rt {
         }
         SDL_SetWindowMinimumSize(window, width, height);
         SDL_HideCursor();
-        #ifdef _WIN32
-        SDL_SetWindowFullscreen(window, true);
-        #endif
         SDL_SyncWindow(window);
 
         // A simple SDL provided renderer.
@@ -501,6 +553,9 @@ namespace rt {
         };
         resize_texture(width / scale, height / scale);
 
+        SdlIo io;
+        game.init(io);
+
         SDL_Event event;
         usize frame = 0;
         bool perf_overlay = false;
@@ -545,8 +600,8 @@ namespace rt {
 
                 std::string line;
                 std::vector<std::pair<draw::Text<draw::Ref<const draw::Image>, std::string>, i32>> lines;
-                for (i32 y = 8; std::getline(out, line); y += font::mine().height + font::mine().leading) {
-                    lines.emplace_back(draw::Text(line, font::mine()), y);
+                for (i32 y = 8; std::getline(out, line); y += font::mine(io).height + font::mine(io).leading) {
+                    lines.emplace_back(draw::Text(line, font::mine(io)), y);
                 }
 
                 i32 greatest_width = 0;
@@ -570,10 +625,14 @@ namespace rt {
                         if (m) scale = std::max(1, scale - 1);
                         apply_window_size();
                     }
+
+                    #ifdef _MSC_VER // Fullscreen button for a funny operating system.
+                    if (input.key_pressed(Key::F1)) SDL_SetWindowFullscreen(window, true);
+                    #endif
                 }
 
-                game.update(input);
-                game.draw(input, target);
+                game.update(io, input);
+                game.draw(io, input, target);
 
                 if (perf_overlay) draw_perf_overlay();
             });

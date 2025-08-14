@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../src/rt/io.hpp"
 #include "../src/rt/stream.hpp"
 #include "../src/rt/audio.hpp"
 #include "../src/rt/game.hpp"
