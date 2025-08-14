@@ -8,6 +8,11 @@
 
 all: setup
 
+# Counts the lines of code :)
+# Requires cloc to be installed of course.
+cloc:
+	@cloc src object tools
+
 # Switch clangd to the native build.
 clangd-build:
 	@echo "CompileFlags:" > .clangd

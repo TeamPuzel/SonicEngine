@@ -8,7 +8,7 @@ set(CMAKE_SYSTEM_PROCESSOR x86_64)
 # This is pretty stupid but I don't want to bother with a better solution. I only need to care like,
 # once when a project is done to build for this shitty platform. I don't care.
 # Set this to wherever your LLVM lives idk.
-set(LLVM_BIN_DIR "/opt/homebrew/Cellar/llvm/20.1.7/bin")
+set(LLVM_BIN_DIR "/opt/homebrew/Cellar/llvm/20.1.7/bin" CACHE PATH "Path to LLVM binaries")
 
 set(CMAKE_C_COMPILER "${LLVM_BIN_DIR}/clang")
 set(CMAKE_CXX_COMPILER "${LLVM_BIN_DIR}/clang")

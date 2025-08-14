@@ -6,6 +6,14 @@
 #include <vector>
 
 /// Encapsulates all global side effects.
+///
+/// Loosely inspired by Zig's idea. Has the pleasant quality in how, similarly to an IO monad, it
+/// indicates function purity. You know that functions that don't take Io& can't perform any.
+/// You know that functions which are pure and don't take Io& can't call other Io& functions.
+///
+/// Unlike an IO monad it's easy to integrate, it's just a context.
+///
+/// Io itself is an abstract class and requires a concrete platform implementation to be used.
 class Io {
   public:
     class Error {

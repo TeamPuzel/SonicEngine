@@ -112,7 +112,7 @@ namespace sonic {
             return Box<Self>::make();
         }
 
-        void serialize(rt::BinaryWriter& writer) const {
+        static void serialize(Self const& self, rt::BinaryWriter& writer) {
             // TODO: Serialize basics and classname.
         }
     };

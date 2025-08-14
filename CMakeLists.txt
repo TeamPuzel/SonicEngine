@@ -4,9 +4,11 @@ project(Sonic C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# I won't really bother to configure MSVC. If one wishes to compile with that sad compiler I suppose
-# just not setting these flags should be enough.
-if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+# Account for MSVC/clang-cl switch based interface when configuring flags.
+if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT MATCHES "MSVC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
+    set(VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -Wno-unused -Wpedantic -Wno-logical-op-parentheses")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftrivial-auto-var-init=pattern")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")

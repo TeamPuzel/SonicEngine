@@ -1,6 +1,14 @@
 // Created by Lua (TeamPuzel) on May 29th 2025.
 // Copyright (c) 2025 All rights reserved.
 //
+// WARNING: I renamed the concepts at play so the documentation refers to things by their old names for now.
+// Drawable -> Plane
+// SizedDrawable -> SizedPlane
+// PrimitiveDrawable -> PrimitivePlane
+// MutableDrawable -> MutablePlane
+//
+// Sorry about that :)
+//
 // This is the main file of the draw abstraction which actually deals with drawing.
 // It is an efficient, portable, functional approach to pixel transformations without the need for hardware acceleration.
 // That being said, through overloading would is possible to get this design hardware accelerated for whatever reason.
@@ -438,7 +446,7 @@ namespace draw {
         T inner;
         i32 item_width, item_height;
       public:
-        constexpr explicit Grid(T& inner, i32 item_width, i32 item_height) noexcept
+        constexpr explicit Grid(T inner, i32 item_width, i32 item_height) noexcept
             : inner(inner), item_width(item_width), item_height(item_height) {}
 
         constexpr auto tile(i32 x, i32 y) const noexcept -> Slice<T> {
