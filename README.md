@@ -25,7 +25,8 @@ The project can be built on any platform using CMake or Visual Studio. The depen
 
 - C++ standard library
 - SDL3
-- (ideally) gnu-make, cmake and ninja (visual studio only compiles the engine without hot-reloading)
+
+Open the project directory in Visual Studio, it will work.
 
 ## How to play
 
