@@ -34,7 +34,7 @@ The controls can be operated in left handed and right handed modes:
 - Move with WASD keys and jump with ENTER
 - Hold down to crouch while standing still or roll up while moving.
 - Hold down and the jump button while still to charge up a spindash.
-- (Misc) + and - keys adjust the integer scale the game is rendering at, the default is 4x.
+- (Misc) + and - keys adjust the integer scale the game is rendering at, the default is 3x.
 - (Debug) Press 1 to toggle the visual debug overlay visualizing collision and more.
 - (Debug) Press 2 to override physics and freely fly around.
 - (Debug) Press 8 to toggle the heuristic refresh rate lock.
