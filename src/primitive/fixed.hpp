@@ -12,26 +12,6 @@
 
 // Workarounds for the awful version of C++ I have to use, C++17.
 namespace trash {
-    #if defined(_MSC_VER) && !CROSS_COMPILING // We do not actually want to use this branch when using Clang after all.
-    /// MSVC does not have a convenient builtin but it has botched semantics.
-    ///
-    /// From stack overflow:
-    /// The member pointer equality operator works differently on compile time and runtime in visual studio.
-    /// Compile time the equality checks the exact match (&N::a and &M::a are different, because of a different Base),
-    /// but runtime it only checks the offset of the class (&N::a and &M::a are at the same offset: 0).
-    /// int M::* and int N::* pointers are not comparable default, but if we create a common base class
-    /// with the same offset, and use member casts (C++20 ISO: § 7.3.12, 2 and § 7.6.1.7, 12),
-    /// they will comparable at the common C base class.
-    ///
-    /// This is completely stupid but does let us know.
-    constexpr auto is_constant_evaluated() noexcept -> bool {
-        struct C {};
-        struct M : C { int a; };
-        struct N : C { int a; };
-
-        return &M::a != static_cast<int C::*>(&N::a);
-    }
-    #else
     /// With clang we can just use the builtin despite being in a prior C++ version than this is
     /// exposed. Technically it means this would not compile with old C++17 clang but who cares.
     /// I do not, they are long unsupported. Using C++17 in any new code is genuinely stupid.
@@ -39,10 +19,11 @@ namespace trash {
     /// combining language modes, it's the same compiler ffs. What a waste of my time.
     ///
     /// I suppose GCC also exists but I don't like GCC. I dislike MSVC even more but I have to support it sadly.
+    ///
+    /// I no longer attempt to support MSVC, it breaks too much.
     constexpr auto is_constant_evaluated() noexcept -> bool {
         return __builtin_is_constant_evaluated();
     }
-    #endif
 }
 
 /// A fixed point numeric type used by the game to more accurately recreate the original physics.
