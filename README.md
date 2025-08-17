@@ -1,12 +1,14 @@
 # Sonic
 
-An implementation of Sonic 1.
+An implementation of a generic, extensible Sonic engine designed to be small in implementation and fun to use.
 
 ## About the project
 
 Why this game:
 - Interesting physics more involved than most tile based games.
-- I had no other ideas.
+- I always wanted to implement a sonic game.
+- I think the sonic fan game space would benefit from an open and portable engine.
+- I had no other 2d game ideas.
 
 ## My version
 
@@ -63,6 +65,28 @@ There were no other abilities in Sonic 1 yet.
 
 ---
 
+## Project structure
+
+### Directories
+
+- include — All the engine headers.
+- src — All the engine source code.
+- object — The object plugin implementations, source code and headers.
+- tools — Python scripts used to generate the sine/cosine tables etc.
+- windows — Windows cross compilation toolchain and libraries.
+- map — My binary file format extension to Tiled and the Tiled map project files.
+- res — Resources used by the game.
+- ref — References for making resources such as unedited sprite sheets found online.
+
+### Build setup
+
+- CMakeLists.txt — Build specification.
+- CMakeSettings.json — Makes Visual Studio set up dependencies correctly on Windows.
+- file_format_spec.txt — The specification of the binary file formats used.
+- makefile — Conveniences for performing various tasks on the project.
+
+---
+
 ## Class structure
 
 The game itself uses a very standard class structure.
@@ -71,7 +95,7 @@ and loaded by the engine proper at runtime as needed.
 
 ```
 Game -> Scene
-          |-> Stage -> [(dynlib) Object]
+          |-> Stage -> [(dynlib) Object -> [Trait]]
           |-> ... and potentially other simple scenes like the opening screen or death screen.
 ```
 
@@ -164,9 +188,10 @@ in chunks, I used to implement a map in a minecraft mod.
 
 ### Inheritance
 
-There are two main (both flat) inheritance hierarchies in the gameplay implementation itself:
+There are three main (both flat) inheritance hierarchies in the gameplay implementation itself:
 - Scene, something currently being rendered and updated by the game.
 - Object, a supertype to all dynamic (non-tile) game objects.
+- Trait, a supertype to all traits which combine inheritance and composition of object code.
 
 There's some other minor uses of inheritance mainly for metaprogramming purposes. Most of my abstraction
 is achieved through C++ traits rather than inheritance.
@@ -174,6 +199,62 @@ is achieved through C++ traits rather than inheritance.
 Objects are quite notably very virtual because they are compiled into separate dynamic libraries
 making them hot-swappable at runtime. Since objects see each other and are recompiled together
 this means even non-virtual changes to the types are sound and propagate after reloading.
+
+In order to avoid multiple and virtual inheritance and all the associated non-standard ABI nonsense I decided to
+keep the hierarchy flat. That by itself would be pretty bad, what about player-enemy interactions for example?
+do we check every enemy kind? C++ pushes one towards using inheritance here. We could have a layer in-between, something
+like `HostileObject` and have enemies derive that instead. Like I said however, it's common knowledge nowadays that
+this is difficult to scale.
+
+The solution to this is the other flat hierarchy, `Trait`. They are mini object components which can be freely added or
+removed at runtime. For example:
+
+```cpp
+/// An object which takes damage from the player on collision.
+class TakesDamageFromPlayer final : public Object::Trait {
+  public:
+    using DamageHandler = auto (Object::*) () -> void;
+
+    DamageHandler handler;
+
+    template <typename T> TakesDamageFromPlayer(T handler) : handler(static_cast<DamageHandler>(handler)) {}
+
+    void damage() {
+        (object->*handler)();
+    }
+};
+```
+
+The association is made at runtime like so:
+
+```cpp
+class Chopper final : public Object, public DefaultCodable<Chopper> {
+  public:
+    Chopper() {
+        add<DamagesPlayer>(DamagesPlayer::UnprotectedOnly);
+        add<TakesDamageFromPlayer>(&Chopper::damage);
+    }
+```
+
+and it fits right alongside normal inheritance-based runtime polymorphism:
+
+```cpp
+void collide_with(Object* other) noexcept override {
+    if (const auto ring = dynamic_cast<Ring*>(other)) {
+        ring->pick_up();
+        rings += 1;
+    }
+
+    if (const auto damaging = other->trait<DamagesPlayer>()) {
+        if ((not rolled_up or damaging->bypass_protection()) and invulnerability == 0) {
+            damage_state = DamageState::Pending;
+            damaged_by_position = other->position;
+        } else if (const auto takes_damage = other->trait<TakesDamageFromPlayer>()) {
+            takes_damage->damage();
+        }
+    }
+}
+```
 
 Another use of inheritance is the loosely Zig inspired `Io` interface which neatly encodes function purity
 into the function signature itself. All side effects are encapsulated within. I think that part of
