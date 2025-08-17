@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class Spring final : public Object, public Codable<Spring> {};
+    class Spring final : public Object, public DefaultCodable<Spring> {};
 }

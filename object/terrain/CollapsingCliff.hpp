@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class CollapsingCliff final : public Object, public Codable<CollapsingCliff> {};
+    class CollapsingCliff final : public Object, public DefaultCodable<CollapsingCliff> {};
 }

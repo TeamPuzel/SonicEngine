@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class Spike final : public Object, public Codable<Spike> {};
+    class Spike final : public Object, public DefaultCodable<Spike> {};
 }

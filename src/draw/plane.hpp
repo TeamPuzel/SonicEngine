@@ -621,6 +621,47 @@ namespace draw {
     }
 }
 
+// Shapes --------------------------------------------------------------------------------------------------------------
+namespace draw {
+    struct Rectangle final {
+        i32 w { 0 }, h { 0 };
+        Color color { color::WHITE };
+
+        constexpr auto width() const noexcept -> i32 {
+            return w;
+        }
+
+        constexpr auto height() const noexcept -> i32 {
+            return h;
+        }
+
+        constexpr auto get(i32 x, i32 y) const noexcept -> Color {
+            return x == 0 or y == 0 or x == w - 1 or y == h - 1 ? color : color::CLEAR;
+        }
+    };
+
+    static_assert(SizedPlane<Rectangle>::value);
+
+    struct FilledRectangle final {
+        i32 w { 0 }, h { 0 };
+        Color color { color::WHITE };
+
+        constexpr auto width() const noexcept -> i32 {
+            return w;
+        }
+
+        constexpr auto height() const noexcept -> i32 {
+            return h;
+        }
+
+        constexpr auto get(i32 x, i32 y) const noexcept -> Color {
+            return color;
+        }
+    };
+
+    static_assert(SizedPlane<FilledRectangle>::value);
+}
+
 // Abstract ------------------------------------------------------------------------------------------------------------
 namespace draw {
     template <typename T> struct Repeat final {
@@ -634,7 +675,7 @@ namespace draw {
         }
 
         constexpr auto height() const noexcept(noexcept(inner.height())) -> i32 {
-            return inner.width();
+            return inner.height();
         }
 
         constexpr auto get(i32 x, i32 y) const

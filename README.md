@@ -52,6 +52,7 @@ The controls can be operated in left handed and right handed modes:
 - (Misc) + and - keys adjust the integer scale the game is rendering at, the default is 3x.
 - (Debug) Press 1 to toggle the visual debug overlay visualizing collision and more.
 - (Debug) Press 2 to override physics and freely fly around.
+- (Debug) Press 3 to toggle the object hitbox overlay (requires also enabling the general debug overlay).
 - (Debug) Press 8 to toggle the heuristic refresh rate lock.
 - (Debug) Press 9 to toggle the performance and refresh rate heuristic overlay.
 - (Debug) Press 0 to toggle vsync.
@@ -59,8 +60,6 @@ The controls can be operated in left handed and right handed modes:
 - (Development) Press R to hot reload object classes (Windows only, on UNIX a reload will automatically signal the binary)
 
 There were no other abilities in Sonic 1 yet.
-
-Note that in Sonic 1 there is a speed cap unless rolled up so that would be the fastest way downhill.
 
 ---
 
@@ -135,7 +134,7 @@ template <typename T> struct Grid final {
 };
 ```
 
-Very simple, it just slices graphics into tiles! With optimizations on this is all optimized away
+Very simple, it just slices graphics into tiles! With optimizations all of this is optimized away
 and performs exceptionally well which is cool.
 
 The compositions can nest forever so you could have a `Grid<Slice<Ref<const Image>>>`. Very cool.

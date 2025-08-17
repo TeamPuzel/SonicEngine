@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class Monitor final : public Object, public Codable<Monitor> {};
+    class Monitor final : public Object, public DefaultCodable<Monitor> {};
 }

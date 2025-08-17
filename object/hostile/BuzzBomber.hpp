@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class BuzzBomber final : public Object, public Codable<BuzzBomber> {};
+    class BuzzBomber final : public Object, public DefaultCodable<BuzzBomber> {};
 }

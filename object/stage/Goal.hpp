@@ -5,5 +5,5 @@
 
 namespace sonic {
     /// A goal sign present at the end of any non-final act.
-    class Goal final : public Object, public Codable<Goal> {};
+    class Goal final : public Object, public DefaultCodable<Goal> {};
 }

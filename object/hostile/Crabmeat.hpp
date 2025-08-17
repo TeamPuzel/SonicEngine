@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class Crabmeat final : public Object, public Codable<Crabmeat> {};
+    class Crabmeat final : public Object, public DefaultCodable<Crabmeat> {};
 }

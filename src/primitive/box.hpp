@@ -61,7 +61,33 @@ template <typename T> class Box final { // NOLINT(readability-identifier-naming)
         return *this->inner;
     }
 
+    /// Performs box identity.
+    template <typename U> friend auto operator==(Box<T> const& lhs, Box<U> const& rhs) noexcept -> bool {
+        return (void*) lhs.raw() == (void*) rhs.raw();
+    }
+
+    template <typename U> friend auto operator!=(Box<T> const& lhs, Box<U> const& rhs) noexcept -> bool {
+        return (void*) lhs.raw() != (void*) rhs.raw();
+    }
+
     auto raw() const noexcept [[clang::lifetimebound]] -> T* {
         return this->inner;
+    }
+
+    constexpr operator bool() {
+        return inner != nullptr;
+    }
+
+    /// Dynamic cast mapping on boxed types instead of raw pointers.
+    /// The box will be null and the original not destroyed if the dynamic cast is invalid.
+    template <typename To> auto cast() -> Box<To> {
+        auto ptr = dynamic_cast<To*>(inner);
+
+        if (ptr) {
+            inner = nullptr;
+            return Box<To>(ptr);
+        } else {
+            return Box<To>();
+        }
     }
 };

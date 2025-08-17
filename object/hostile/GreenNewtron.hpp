@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class GreenNewtron final : public Object, public Codable<GreenNewtron> {};
+    class GreenNewtron final : public Object, public DefaultCodable<GreenNewtron> {};
 }

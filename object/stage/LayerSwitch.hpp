@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class LayerSwitch final : public Object, public Codable<LayerSwitch> {};
+    class LayerSwitch final : public Object, public DefaultCodable<LayerSwitch> {};
 }

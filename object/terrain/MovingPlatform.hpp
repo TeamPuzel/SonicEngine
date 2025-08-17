@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class MovingPlatform final : public Object, public Codable<MovingPlatform> {};
+    class MovingPlatform final : public Object, public DefaultCodable<MovingPlatform> {};
 }

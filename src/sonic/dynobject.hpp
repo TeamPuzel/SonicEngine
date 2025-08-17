@@ -49,10 +49,10 @@ namespace sonic {
     template <typename Self> struct DynamicObject<Self, std::enable_if_t<
         std::is_same<decltype(Self::rebuild(std::declval<Self const&>())), Box<Object>>::value and
         std::is_same<decltype(Self::serialize(std::declval<Self const&>(), std::declval<rt::BinaryWriter&>())), void>::value and
-        std::is_same<decltype(Self::deserialize(std::declval<rt::BinaryReader&>())), Box<Object>>::value
+        std::is_same<decltype(Self::deserialize(std::declval<rt::BinaryReader&>(), std::declval<i32>(), std::declval<i32>())), Box<Object>>::value
     >> : std::true_type {};
 
     using ObjectRebuilder    = auto (*) (Object const&) -> Box<Object>;
-    using ObjectDeserializer = auto (*) (rt::BinaryReader&) -> Box<Object>;
+    using ObjectDeserializer = auto (*) (rt::BinaryReader&, i32 x, i32 y) -> Box<Object>;
     using ObjectSerializer   = auto (*) (Object const&, rt::BinaryWriter&) -> void;
 }

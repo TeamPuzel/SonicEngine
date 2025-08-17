@@ -5,5 +5,5 @@
 
 namespace sonic {
     /// A checkpoint gate.
-    class Checkpoint final : public Object, public Codable<Checkpoint> {};
+    class Checkpoint final : public Object, public DefaultCodable<Checkpoint> {};
 }

@@ -169,6 +169,11 @@ constexpr auto operator-(fixed self) noexcept -> fixed {
 }
 
 [[clang::always_inline]]
+constexpr auto operator+(fixed self) noexcept -> fixed {
+    return self;
+}
+
+[[clang::always_inline]]
 constexpr auto operator*(fixed lhs, fixed rhs) noexcept -> fixed {
     i64 result = i64(fixed::into_raw(lhs)) * fixed::into_raw(rhs);
     return fixed::from_raw(i32(result >> 8));

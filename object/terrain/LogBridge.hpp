@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class LogBridge final : public Object, public Codable<LogBridge> {};
+    class LogBridge final : public Object, public DefaultCodable<LogBridge> {};
 }

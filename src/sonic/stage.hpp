@@ -7,6 +7,7 @@
 #include <rt>
 #include <sstream>
 #include <vector>
+#include <unordered_set>
 #include <functional>
 #include "scene.hpp"
 #include "object.hpp"
@@ -23,9 +24,9 @@ namespace sonic {
     };
 
     struct Tile final {
-        i32 x, y;
-        bool mirror_x;
-        bool mirror_y;
+        i32 x { -1 }, y { -1 };
+        bool mirror_x { false };
+        bool mirror_y { false };
 
         static auto read(rt::BinaryReader& reader) -> Tile {
             return Tile {
@@ -44,12 +45,12 @@ namespace sonic {
     };
 
     struct SolidTile final {
-        i32 x, y;
-        angle angle;
-        Solidity solidity;
-        bool flag;
-        bool mirror_x;
-        bool mirror_y;
+        i32 x { -1 }, y { -1 };
+        angle angle { 0 };
+        Solidity solidity { Solidity::Full };
+        bool flag { false };
+        bool mirror_x { false };
+        bool mirror_y { false };
 
         constexpr auto empty() const noexcept -> bool {
             return x == -1 and y == -1;
@@ -82,45 +83,140 @@ namespace sonic {
         std::vector<Tile> foreground;
         std::vector<SolidTile> collision;
         std::vector<Box<Object>> objects;
-        Object* primary;
-        usize tick;
+        std::unordered_set<Object*> removal_queue;
+        Object* primary { nullptr };
+        usize tick { 0 };
+
+        // Some implementation notes:
+        //
+        // It would be nice for stages to contain an executor objects could schedule coroutines onto (C++20).
+        // I don't think the game has any blocking operations to perform so unless the need arises this is just an idea.
+        //
+        // It would be pretty cool to do that in combination with networking so that multiple players can play together,
+        // in the original games the camera just follows Sonic so the game is practically unplayable for the other,
+        // but in a networked setup it could work better :)
 
       public:
         bool visual_debug { false };
         bool movement_debug { false };
+        bool hitbox_debug { false };
 
-        [[gnu::hot]] [[gnu::const]]
-        auto tile(i32 x, i32 y) const -> Tile const& {
-            return foreground.at(y + x * height);
+        /// Schedules the object for removal at the end of the current update cycle.
+        /// It remains valid until then.
+        void remove(Object* object) noexcept {
+            // TODO: This can throw, but it makes no sense to propagate to the object.
+            // It would be ideal to implement a handler in the stage itself.
+            // This is of course just me being pedantic since if we run out of memory there isn't much we can do anyway.
+            removal_queue.insert(object);
         }
 
-        [[gnu::hot]] [[gnu::const]]
-        auto solid_tile(i32 x, i32 y) const -> SolidTile const& {
-            return collision.at(y + x * height);
+        void add(Box<Object>&& object) noexcept {
+            // TODO: This can throw, but it makes no sense to propagate to the object.
+            objects.emplace_back(std::move(object));
+        }
+
+        [[gnu::hot]] [[gnu::const]] auto tile(i32 x, i32 y) const -> Tile {
+            if (x >= 0 and x < width and y >= 0 and y < height) {
+                return foreground.at(y + x * height);
+            } else {
+                // Note the semantics. We are reading "out of bounds" but what does that mean?
+                // Returning optional or nullptr seems like it would make sense but really, the outside
+                // is just semantically empty and this is far more graceful since no code has to handle it further.
+                return Tile();
+            }
+        }
+
+        [[gnu::hot]] [[gnu::const]] auto solid_tile(i32 x, i32 y) const -> SolidTile {
+            if (x >= 0 and x < width and y >= 0 and y < height) {
+                return collision.at(y + x * height);
+            } else {
+                // Note the semantics. We are reading "out of bounds" but what does that mean?
+                // Returning optional or nullptr seems like it would make sense but really, the outside
+                // is just semantically empty and this is far more graceful since no code has to handle it further.
+                return SolidTile();
+            }
         }
 
         Stage(Ref<const Image> height_tiles) : height_tiles(height_tiles) {}
 
+        /// We need not remove inactive objects but we have no way of tracing this.
+        /// This *is* optimizable if we manage sorting of objects sensibly and store active objects
+        /// in the back of the object vector. The back because we wish to be able to reorder quickly without
+        /// shifting the entire vector.
+        ///
+        /// For now though it should be fine even though it's not an efficient implementation at all.
+        ///
+        /// This horrible iterator mess can also be significantly cleaned up in C++20.
+        void apply_removal_queue() {
+            objects.erase(
+                std::remove_if(objects.begin(), objects.end(),
+                    [this] (Box<Object>& box) {
+                        return removal_queue.find(box.raw()) != removal_queue.end();
+                    }
+                ),
+                objects.end()
+            );
+            removal_queue.clear();
+        }
+
         void update(Io& io, rt::Input const& input) override {
             if (input.key_pressed(rt::Key::Num1)) visual_debug = !visual_debug;
             if (input.key_pressed(rt::Key::Num2)) movement_debug = !movement_debug;
-
-            // On UNIX this is automatic and mapped to SIGUSR1, no need for a keybind.
-            // if (input.key_pressed(rt::Key::R)) hot_reload();
+            if (input.key_pressed(rt::Key::Num3)) hitbox_debug = !hitbox_debug;
 
             const auto [px, py] = primary->pixel_pos();
-            constexpr i32 X_UPDATE_DISTANCE = 320 + 320 / 2;
-            constexpr i32 Y_UPDATE_DISTANCE = 224 + 224 / 2;
+            static constexpr i32 X_UPDATE_DISTANCE = 320 + 320 / 2;
+            static constexpr i32 Y_UPDATE_DISTANCE = 224 + 224 / 2;
 
             // We don't update objects too far away from the primary.
             //
             // The original resolution is 320x224 so the approximation used will be only processing
             // objects when they are an original screen and a half distance away.
+            std::vector<Object*> active_objects;
             for (Box<Object>& object : objects) {
                 const auto [ox, oy] = object->pixel_pos();
-                if (std::abs(ox - px) < X_UPDATE_DISTANCE and std::abs(oy - py) < Y_UPDATE_DISTANCE)
-                    object->update(input, *this);
+                if (object->force_active() or std::abs(ox - px) < X_UPDATE_DISTANCE and std::abs(oy - py) < Y_UPDATE_DISTANCE) {
+                    active_objects.push_back(object.raw());
+                }
             }
+
+            // The semantics are defined such that we handle collision first in sorting order on all active objects.
+            // Updates follow in the same order but after all the collision. We iterate twice.
+            // Also, the time complexity is silly here *but* it's just nearby objects so we should never hit
+            // any actual scaling issues.
+            //
+            // There is a lifetime concern here. Remember that objects should be able to schedule themselves
+            // for removal at the end of the update process, but must not be removed during the update
+            // process itself.
+            //
+            // It is however unsound for any objects to ever reference each other directly at all. The reasons are many:
+            // - Have fun serializing insane graphs.
+            // - Lifetime issues.
+            // For this reason, if any objects ever need to explicitly hold on to other objects between cycles,
+            // a reference counting scheme shall be used:
+            // - Smart, typed references can be requested from the stage.
+            // - This smart (uniquely owned) reference object will internally hold on to the stage.
+            // - When the smart reference object is destroyed it will automatically unregister itself.
+            // - If any smart reference objects exists the object will be asked if it is okay to proceed with
+            //   deletion.
+            // - If it answers yes the object shall be destroyed and references invalidated.
+            // - Unchecked access to an invalidated reference shall throw an exception which the stage will catch and
+            //   the then immediately terminate the invalid object and any smart references to it.
+            // This is the first and yet unimplemented draft of the approach.
+            for (const auto object : active_objects) {
+                for (const auto other : active_objects) {
+                    if (object == other) continue;
+                    if (object->absolute_hitbox().overlaps(other->absolute_hitbox())) {
+                        object->collide_with(other);
+                    }
+                }
+            }
+            for (const auto object : active_objects) {
+                object->managed_update(input, *this);
+                object->update(input, *this);
+            }
+
+            apply_removal_queue();
 
             tick += 1;
         }
@@ -135,6 +231,7 @@ namespace sonic {
 
             const auto [_px, _py] = primary->tile_pos();
             const auto [_ppx, _ppy] = primary->pixel_pos();
+            const auto camera_buffer = primary->camera_buffer();
 
             // Because we are using a terrible old C++ version we can't capture structured bindings in lambdas.
             // That's fine, I'll reassign them, stupid language >:(
@@ -276,7 +373,7 @@ namespace sonic {
             // We can now move on to drawing the sorted tiles and objects back to front.
             for (const auto command : commands) {
                 if (command.type == DrawCommand::Type::Tile) {
-                    auto const& tile = this->tile(command.tile.x, command.tile.y);
+                    const auto tile = this->tile(command.tile.x, command.tile.y);
 
                     auto tilemap = sheet
                         | draw::grid(16, 16);
@@ -317,7 +414,7 @@ namespace sonic {
 
                 for (const auto command : commands) {
                     if (command.type == DrawCommand::Type::Tile) {
-                        auto const& tile = this->solid_tile(command.tile.x, command.tile.y);
+                        const auto tile = this->solid_tile(command.tile.x, command.tile.y);
 
                         auto tilemap = height_tiles
                             | draw::grid(16, 16);
@@ -345,7 +442,22 @@ namespace sonic {
                     }
                     if (command.type == DrawCommand::Type::Object) {
                         Object const& object = command.object.ref.get();
-                        object.debug_draw(out, camera_target, *this);
+
+                        object.debug_draw(io, out, camera_target, *this);
+
+                        if (hitbox_debug) {
+                            const auto hitbox = object.absolute_hitbox();
+                            camera_target | draw::draw(
+                                draw::FilledRectangle {
+                                    hitbox.w,
+                                    hitbox.h,
+                                    draw::color::pico::RED,
+                                } | draw::map([] (Color c, i32 x, i32 y) -> Color { return c.with_a(128); }),
+                                hitbox.x,
+                                hitbox.y,
+                                draw::blend::alpha
+                            );
+                        }
                     }
                 }
 
@@ -358,12 +470,22 @@ namespace sonic {
 
         enum class SensorDirection : u8 { Down, Right, Up, Left };
 
-        struct SensorResult final { i32 distance; math::angle angle; bool flag; };
+        struct SensorResult final {
+            i32 distance;
+            math::angle angle;
+            bool flag;
+
+            constexpr auto hit(i32 back, i32 forward) const -> bool {
+                return distance > -back and distance < forward;
+            };
+        };
 
         /// Inlining this is rather important, we are doing some composition and this is called in a loop
         /// so we'd get janky stack shenanigans if we actually called this.
+        ///
+        /// And yes, I checked the assembly, when not inlined the code for this function genuinely is really sad.
         [[clang::always_inline]] [[gnu::hot]] [[gnu::const]] auto solid_at(i32 x, i32 y) const -> bool {
-            auto const& tile = solid_tile(x / 16, y / 16);
+            const auto tile = solid_tile(x / 16, y / 16);
             return height_tiles
                 | draw::grid(16, 16)
                 | draw::tile(tile.x, tile.y)
@@ -424,7 +546,7 @@ namespace sonic {
                 regress();
             }
 
-            auto const& tile = solid_tile(cx / 16, cy / 16);
+            const auto tile = solid_tile(cx / 16, cy / 16);
 
             return { distance(), tile.angle, tile.flag };
         }
@@ -526,8 +648,7 @@ namespace sonic {
 
                 const auto position = reader.position();
 
-                auto instance = descriptor.deserializer(reader);
-                instance->position = math::point<fixed> { x, y };
+                auto instance = descriptor.deserializer(reader, x, y);
                 if (classname == "Sonic") ret->primary = instance.raw();
                 instance->classname = classname;
                 ret->objects.emplace_back(std::move(instance));
@@ -541,22 +662,31 @@ namespace sonic {
         [[gnu::cold]] void hot_reload(Io& io) override {
             class_loader::swap_registry();
             for (Box<Object>& object : objects) {
-                if (not object->is_dynobject()) continue;
+                if (not object->is_dynobject()) {
+                    // We must clear out objects of unknown provenance since they are likely
+                    // to come from a dynamic library we are about to drop.
+                    remove(object.raw());
+                } else {
+                    auto descriptor = class_loader::load(io, object->classname);
+                    auto replacement = descriptor.rebuilder(*object);
 
-                auto descriptor = class_loader::load(io, object->classname);
-                auto replacement = descriptor.rebuilder(*object);
+                    replacement->position = object->position;
+                    replacement->classname = object->classname;
+                    if (object->classname == "Sonic") primary = replacement.raw();
 
-                replacement->position = object->position;
-                replacement->classname = object->classname;
-                if (object->classname == "Sonic") primary = replacement.raw();
-
-                std::swap(object, replacement);
+                    std::swap(object, replacement);
+                }
             }
+            apply_removal_queue();
             class_loader::drop_old_object_classes();
         }
 
         ~Stage() noexcept {
-            /// Make sure that we no longer hold on to objects, we can't destroy them after clearing the class loader.
+            // Make sure that we no longer hold on to objects, we can't destroy them after clearing the class loader.
+            // i.e. Letting them be destroyed naturally is undefined.
+            // TODO: The class loader should just be an instance, why is it global lol.
+            // Also, throw if someone tries to make two class loaders, idk if all platforms allow loading
+            // the same library in multiple instances?
             objects.clear();
             class_loader::clear();
         }

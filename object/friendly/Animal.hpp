@@ -4,5 +4,5 @@
 #include <sonic>
 
 namespace sonic {
-    class Animal final : public Object, public Codable<Animal> {};
+    class Animal final : public Object, public DefaultCodable<Animal> {};
 }

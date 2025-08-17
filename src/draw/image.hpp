@@ -15,6 +15,8 @@ namespace draw {
     /// The simplest sized primitive, it makes for a general purpose read/write drawable.
     ///
     /// The state surrounding the described sized area is always clear.
+    ///
+    /// TODO: Replace std::vector with something sane, 24 bytes is a joke.
     class Image final {
         std::vector<Color> data;
         i32 w, h;
