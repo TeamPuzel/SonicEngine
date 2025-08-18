@@ -10,44 +10,56 @@ namespace draw {
     struct Color final {
         u8 r, g, b, a;
 
+        [[clang::always_inline]] [[gnu::const]]
         static constexpr Color rgba(u8 r, u8 g, u8 b, u8 a = 255) noexcept {
             return Color { r, g, b, a };
         }
 
-        template <typename Blend> constexpr auto blend_over(Color other, Blend const& blend) const noexcept -> Color {
-            return blend(*this, other);
+        template <typename Blend>
+        [[clang::always_inline]]
+        constexpr auto blend_over(this Color self, Color other, Blend const& blend) noexcept -> Color {
+            return blend(self, other);
         }
 
-        template <typename Blend> constexpr auto blend_under(Color other, Blend const& blend) const noexcept -> Color {
-            return blend(other, *this);
+        template <typename Blend>
+        [[clang::always_inline]]
+        constexpr auto blend_under(this Color self, Color other, Blend const& blend) noexcept -> Color {
+            return blend(other, self);
         }
 
-        constexpr auto operator==(Color other) const noexcept -> bool {
-            return r == other.r and g == other.g and b == other.b and a == other.a;
+        [[clang::always_inline]] [[gnu::const]]
+        constexpr auto operator==(this Color self, Color other) noexcept -> bool {
+            return self.r == other.r and self.g == other.g and self.b == other.b and self.a == other.a;
         }
 
-        constexpr auto operator!=(Color other) const noexcept -> bool {
-            return !(*this == other);
+        [[clang::always_inline]] [[gnu::const]]
+        constexpr auto operator!=(this Color self, Color other) noexcept -> bool {
+            return !(self == other);
         }
 
-        constexpr auto with_r(u8 r) const noexcept -> Color {
-            return { r, g, b, a };
+        [[clang::always_inline]] [[gnu::const]]
+        constexpr auto with_r(this Color self, u8 r) noexcept -> Color {
+            return { r, self.g, self.b, self.a };
         }
 
-        constexpr auto with_g(u8 g) const noexcept -> Color {
-            return { r, g, b, a };
+        [[clang::always_inline]] [[gnu::const]]
+        constexpr auto with_g(this Color self, u8 g) noexcept -> Color {
+            return { self.r, g, self.b, self.a };
         }
 
-        constexpr auto with_b(u8 b) const noexcept -> Color {
-            return { r, g, b, a };
+        [[clang::always_inline]] [[gnu::const]]
+        constexpr auto with_b(this Color self, u8 b) noexcept -> Color {
+            return { self.r, self.g, b, self.a };
         }
 
-        constexpr auto with_a(u8 a) const noexcept -> Color {
-            return { r, g, b, a };
+        [[clang::always_inline]] [[gnu::const]]
+        constexpr auto with_a(this Color self, u8 a) noexcept -> Color {
+            return { self.r, self.g, self.b, a };
         }
     };
 
     namespace blend {
+        [[clang::always_inline]] [[gnu::const]]
         constexpr auto overwrite(Color top, Color bottom) noexcept -> Color {
             return top;
         }
@@ -56,12 +68,14 @@ namespace draw {
         /// completely and no blending is actually performed.
         ///
         /// This is a great default because it remains associative unlike more advanced alpha blending.
+        [[clang::always_inline]] [[gnu::const]]
         constexpr auto binary(Color top, Color bottom) noexcept -> Color {
             return top.a == 255 ? top : bottom;
         }
 
         /// Alpha blending, not intended for use by the game since the original hardware didn't support
         /// transparency, however it could be useful for transparent debug overlays.
+        [[clang::always_inline]] [[gnu::const]]
         constexpr auto alpha(Color top, Color bottom) noexcept -> Color {
             const i32 tr = top.r, tg = top.g, tb = top.b, ta = top.a;
             const i32 br = bottom.r, bg = bottom.g, bb = bottom.b, ba = bottom.a;

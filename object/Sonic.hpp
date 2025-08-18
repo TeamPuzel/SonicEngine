@@ -404,7 +404,10 @@ namespace sonic {
                             }
                         }
 
-                        if (left == right) {
+                        if (left == right or
+                            left and not right and ground_speed < 0 or
+                            right and not left and ground_speed > 0
+                        ) {
                             ground_speed -= std::min(math::abs(ground_speed), ROLL_FRICTION_SPEED) * math::sign(ground_speed);
                         }
                     }
