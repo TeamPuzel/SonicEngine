@@ -573,7 +573,7 @@ namespace sonic {
                 case 3: return { -y, +x };
             }
 
-            intr::unreachable();
+            std::unreachable();
         }
 
         [[clang::always_inline]] [[gnu::const]]
@@ -584,9 +584,7 @@ namespace sonic {
 
         /// Visualises a sensor within a target.
         /// The target's origin should align with the relative space origin and need not have size.
-        template <typename T>
-        void sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, T target, Color color) const {
-            static_assert(draw::MutablePlane<T>::value);
+        void sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, draw::MutablePlane auto target, Color color) const {
             const auto res = sense(relative_space, x, y, direction);
 
             switch (direction) {
@@ -597,9 +595,7 @@ namespace sonic {
             }
         }
 
-        template <typename T>
-        void sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, Object::Mode mode, T target, Color color) const {
-            static_assert(draw::MutablePlane<T>::value);
+        void sense_draw(Object const* relative_space, i32 x, i32 y, SensorDirection direction, Object::Mode mode, draw::MutablePlane auto target, Color color) const {
             const auto res = sense(relative_space, x, y, direction, mode);
 
             auto rotated_target = target

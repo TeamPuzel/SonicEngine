@@ -149,7 +149,7 @@ namespace sonic {
         }
 
         void collide_with(Object* other) noexcept override {
-            if (const auto ring = dynamic_cast<Ring*>(other)) {
+            if (const auto ring = flat_cast<Ring>(other)) {
                 ring->pick_up();
                 rings += 1;
             }

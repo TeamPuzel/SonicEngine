@@ -63,8 +63,8 @@
 // but they are currently unimplemented simply because it's not worth it at low resolutions like the sonic game,
 // and I have absolutely no intention of using C++ for 2d games ever again, it is not a great fit.
 #pragma once
+#include <concepts>
 #include <primitive>
-#include <type_traits>
 #include <utility>
 #include <algorithm>
 #include "color.hpp"
@@ -82,32 +82,22 @@ namespace draw {
         BottomRight,
     };
 
-    template <typename, typename = void> struct Plane : std::false_type {};
-    template <typename, typename = void> struct MutablePlane : std::false_type {};
-    template <typename, typename = void> struct SizedPlane : std::false_type {};
-    template <typename, typename, typename = void> struct PrimitivePlane : std::false_type {};
+    template <typename Self> concept Plane = requires(Self const& self, i32 x, i32 y) {
+        { self.get(x, y) } -> std::same_as<Color>;
+    };
 
-    template <typename Self> struct Plane<Self, std::enable_if_t<
-        std::is_same<decltype(std::declval<Self const&>().get(std::declval<i32>(), std::declval<i32>())), Color>::value
-    >> : std::true_type {};
+    template <typename Self> concept MutablePlane = Plane<Self> and requires(Self& self, i32 x, i32 y, Color color) {
+        { self.set(x, y, color) } -> std::same_as<void>;
+    };
 
-    template <typename Self> struct SizedPlane<Self, std::enable_if_t<
-        Plane<Self>::value and
-        std::is_same<decltype(std::declval<Self const&>().width()), i32>::value and
-        std::is_same<decltype(std::declval<Self const&>().height()), i32>::value
-    >> : std::true_type {};
+    template <typename Self> concept SizedPlane = Plane<Self> and requires(Self const& self) {
+        { self.width() } -> std::same_as<i32>;
+        { self.height() } -> std::same_as<i32>;
+    };
 
-    template <typename Self> struct MutablePlane<Self, std::enable_if_t<
-        Plane<Self>::value and
-        std::is_same<decltype(std::declval<Self&>().set(
-            std::declval<i32>(), std::declval<i32>(), std::declval<Color>()
-        )), void>::value
-    >> : std::true_type {};
-
-    template <typename Self, typename From> struct PrimitivePlane<Self, From, std::enable_if_t<
-        Plane<Self>::value and SizedPlane<From>::value and
-        std::is_same<decltype(Self::flatten(std::declval<From const&>())), Self>::value
-    >> : std::true_type {};
+    template <typename Self, typename From> concept PrimitivePlane = SizedPlane<From> and requires(From const& other) {
+        { Self::flatten(other) } -> std::same_as<Self>;
+    };
 }
 
 /// Performs forwarding adapter composition. Based on the design of std::ranges.
@@ -122,8 +112,7 @@ constexpr auto operator|(Self&& self, Adapt&& adapt) noexcept(noexcept(std::forw
 ///
 /// Comparing infinite drawables is often possible through various tricks based on the math behind
 /// its infinite size, except for some truly infinite planes like an InfiniteImage (type not implemented in the C++ version).
-template <typename L, typename R, std::enable_if_t<draw::SizedPlane<L>::value and draw::SizedPlane<R>::value> = 0>
-constexpr auto operator==(L const& lhs, R const& rhs) -> bool {
+template <draw::SizedPlane L, draw::SizedPlane R> constexpr auto operator==(L const& lhs, R const& rhs) -> bool {
     if (lhs.width() != rhs.width() or lhs.height() != rhs.height()) return false;
     for (i32 x = 0; x < lhs.width(); x += 1) {
         for (i32 y = 0; y < lhs.height(); y += 1) {
@@ -134,19 +123,18 @@ constexpr auto operator==(L const& lhs, R const& rhs) -> bool {
 }
 
 /// Older C++ versions do not derive this from equality itself yet.
-template <typename L, typename R, std::enable_if_t<draw::SizedPlane<L>::value and draw::SizedPlane<R>::value> = 0>
-constexpr auto operator!=(L const& lhs, R const& rhs) -> bool {
+template <draw::SizedPlane L, draw::SizedPlane R> constexpr auto operator!=(L const& lhs, R const& rhs) -> bool {
     return !(lhs == rhs);
 }
 
 // Flattening ----------------------------------------------------------------------------------------------------------
 namespace draw {
     namespace adapt {
-        template <typename T> struct Flatten final {
-            template <typename U> constexpr T operator()(U const& self) const noexcept(noexcept(T::flatten(self))) {
-                static_assert(SizedPlane<U>::value);
-                static_assert(PrimitivePlane<T, U>::value, "Only primitives can be flattened into");
-
+        template <Plane T> struct Flatten final {
+            template <SizedPlane U> constexpr T operator()(U const& self) const noexcept(noexcept(T::flatten(self)))
+            requires
+                PrimitivePlane<T, U>
+            {
                 return T::flatten(self);
             }
         };
@@ -165,13 +153,13 @@ namespace draw {
 namespace draw {
     namespace adapt {
         struct Width final {
-            template <typename T> constexpr auto operator()(T const& self) const noexcept(noexcept(self.width())) -> i32 {
+            template <SizedPlane T> constexpr auto operator()(T const& self) const noexcept(noexcept(self.width())) -> i32 {
                 return self.width();
             }
         };
 
         struct Height final {
-            template <typename T> constexpr auto operator()(T const& self) const noexcept(noexcept(self.height())) -> i32 {
+            template <SizedPlane T> constexpr auto operator()(T const& self) const noexcept(noexcept(self.height())) -> i32 {
                 return self.height();
             }
         };
@@ -179,7 +167,7 @@ namespace draw {
         struct Get final {
             i32 x, y;
 
-            template <typename T> constexpr auto operator()(T const& self) const noexcept(noexcept(self.get(x, y))) -> Color {
+            template <Plane T> constexpr auto operator()(T const& self) const noexcept(noexcept(self.get(x, y))) -> Color {
                 return self.get(x, y);
             }
         };
@@ -188,7 +176,7 @@ namespace draw {
             i32 x, y;
             Color color;
 
-            template <typename T> constexpr auto operator()(T& self) const noexcept(self.set(x, y, color)) -> T& {
+            template <MutablePlane T> constexpr auto operator()(T& self) const noexcept(self.set(x, y, color)) -> T& {
                 return self.set(x, y, color);
             }
         };
@@ -241,9 +229,7 @@ namespace draw {
         struct Clear final {
             Color color;
 
-            template <typename T> constexpr T& operator()(T& self) const {
-                static_assert(SizedPlane<T>::value and MutablePlane<T>::value);
-
+            template <typename T> constexpr T& operator()(T& self) const requires SizedPlane<T> and MutablePlane<T> {
                 for (i32 x = 0; x < self.width(); x += 1) {
                     for (i32 y = 0; y < self.height(); y += 1) {
                         self.set(x, y, color);
@@ -261,9 +247,7 @@ namespace draw {
             constexpr Pixel(i32 x, i32 y, Color color, Blend blend_mode)
                 : x(x), y(y), color(color), blend_mode(blend_mode) {}
 
-            template <typename T> constexpr T& operator()(T& self) const {
-                static_assert(SizedPlane<T>::value and MutablePlane<T>::value);
-
+            template <typename T> constexpr T& operator()(T& self) const requires SizedPlane<T> and MutablePlane<T> {
                 self.set(x, y, color.blend_over(self.get(x, y), blend_mode));
                 return self;
             }
@@ -273,9 +257,7 @@ namespace draw {
             i32 sx, sy, dx, dy;
             Color color;
 
-            template <typename T> constexpr T& operator()(T& self) const {
-                static_assert(MutablePlane<T>::value);
-
+            template <MutablePlane T> constexpr T& operator()(T& self) const {
                 i32 x0 = sx;
                 i32 y0 = sy;
                 i32 x1 = dx;
@@ -306,7 +288,7 @@ namespace draw {
             }
         };
 
-        template <typename D, typename Blend> struct Draw final {
+        template <SizedPlane D, typename Blend> struct Draw final {
             D const& drawable;
             i32 x, y;
             Blend blend_mode;
@@ -314,10 +296,7 @@ namespace draw {
             constexpr Draw(D const& drawable, i32 x, i32 y, Blend blend_mode)
                 : drawable(drawable), x(x), y(y), blend_mode(blend_mode) {}
 
-            template <typename T> constexpr T& operator()(T& self) const {
-                static_assert(SizedPlane<D>::value);
-                static_assert(SizedPlane<T>::value and MutablePlane<T>::value);
-
+            template <typename T> constexpr T& operator()(T& self) const requires SizedPlane<T> and MutablePlane<T> {
                 const auto width = drawable.width();
                 const auto height = drawable.height();
 
@@ -347,7 +326,7 @@ namespace draw {
         return adapt::Pixel { x, y, color, blend::binary };
     }
 
-    template <typename D, typename Blend> constexpr adapt::Draw<D, Blend> draw(D const& drawable, i32 x, i32 y, Blend blend_mode) {
+    template <SizedPlane D, typename Blend> constexpr adapt::Draw<D, Blend> draw(D const& drawable, i32 x, i32 y, Blend blend_mode) {
         return adapt::Draw { drawable, x, y, blend_mode };
     }
 
@@ -362,17 +341,17 @@ namespace draw {
 
 // Transformation ------------------------------------------------------------------------------------------------------
 namespace draw {
-    /// A construct similar to the standard reference wrapper but exposing the drawable interface.
-    template <typename T> struct Ref final {
+    /// A construct similar to the standard reference wrapper but exposing the plane interface.
+    template <Plane T> struct Ref final {
         T& inner;
 
         constexpr Ref(T& inner) : inner(inner) {}
 
-        constexpr auto width() const noexcept(noexcept(inner.width())) -> i32 {
+        constexpr auto width() const noexcept(noexcept(inner.width())) -> i32 requires SizedPlane<T> {
             return inner.width();
         }
 
-        constexpr auto height() const noexcept(noexcept(inner.height())) -> i32 {
+        constexpr auto height() const noexcept(noexcept(inner.height())) -> i32 requires SizedPlane<T> {
             return inner.height();
         }
 
@@ -380,14 +359,12 @@ namespace draw {
             return inner.get(x, y);
         }
 
-        constexpr void set(i32 x, i32 y, Color color) noexcept(noexcept(inner.set(x, y, color))) {
+        constexpr void set(i32 x, i32 y, Color color) noexcept(noexcept(inner.set(x, y, color))) requires MutablePlane<T> {
             inner.set(x, y, color);
         }
     };
 
-    template <typename T> class Slice final {
-        static_assert(Plane<T>::value);
-
+    template <Plane T> class Slice final {
         T inner;
         i32 x, y, w, h;
 
@@ -440,11 +417,10 @@ namespace draw {
         }
     };
 
-    template <typename T> struct Grid final {
-        static_assert(Plane<T>::value);
-
+    template <Plane T> struct Grid final {
         T inner;
         i32 item_width, item_height;
+
       public:
         constexpr explicit Grid(T inner, i32 item_width, i32 item_height) noexcept
             : inner(inner), item_width(item_width), item_height(item_height) {}
@@ -458,8 +434,7 @@ namespace draw {
         struct Slice final {
             i32 x, y, width, height;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
-                static_assert(Plane<T>::value);
+            template <Plane T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
                 return draw::Slice<T>(inner, x, y, width, height);
             }
         };
@@ -467,8 +442,7 @@ namespace draw {
         struct Grid final {
             i32 item_width, item_height;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Grid<T> {
-                static_assert(Plane<T>::value);
+            template <Plane T> constexpr auto operator()(T inner) const noexcept -> draw::Grid<T> {
                 return draw::Grid<T>(inner, item_width, item_height);
             }
         };
@@ -476,25 +450,23 @@ namespace draw {
         struct Shift final {
             i32 x, y;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
-                static_assert(SizedPlane<T>::value);
+            template <SizedPlane T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
                 return draw::Slice<T>(inner, x, y, inner.width(), inner.height());
             }
         };
 
         struct AsSlice final {
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
-                static_assert(SizedPlane<T>::value);
+            template <SizedPlane T> constexpr auto operator()(T inner) const noexcept -> draw::Slice<T> {
                 return draw::Slice<T>(inner, 0, 0, inner.width(), inner.height());
             }
         };
 
         struct AsRef final {
-            template <typename T> constexpr auto operator()(T& inner) const noexcept -> Ref<T> {
+            template <Plane T> constexpr auto operator()(T& inner) const noexcept -> Ref<T> {
                 return inner;
             }
 
-            template <typename T> constexpr auto operator()(T const& inner) const noexcept -> Ref<const T> {
+            template <Plane T> constexpr auto operator()(T const& inner) const noexcept -> Ref<const T> {
                 return inner;
             }
         };
@@ -502,7 +474,7 @@ namespace draw {
         struct Tile final {
             i32 x, y;
 
-            template <typename T> constexpr auto operator()(draw::Grid<T> const& self) const noexcept -> draw::Slice<T> {
+            template <Plane T> constexpr auto operator()(draw::Grid<T> const& self) const noexcept -> draw::Slice<T> {
                 return self.tile(x, y);
             }
         };
@@ -542,9 +514,7 @@ namespace draw {
 
 // Mapping -------------------------------------------------------------------------------------------------------------
 namespace draw {
-    template <typename T, typename F> struct Map final {
-        static_assert(Plane<T>::value);
-
+    template <Plane T, typename F> struct Map final {
         T inner;
         F fn;
 
@@ -565,9 +535,7 @@ namespace draw {
         }
     };
 
-    template <typename T, typename F> struct MapPos final {
-        static_assert(Plane<T>::value);
-
+    template <Plane T, typename F> struct MapPos final {
         T inner;
         F fn;
 
@@ -594,7 +562,7 @@ namespace draw {
         template <typename F> struct Map final {
             F fn;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Map<T, F> {
+            template <Plane T> constexpr auto operator()(T inner) const noexcept -> draw::Map<T, F> {
                 return draw::Map<T, F> { inner, fn };
             }
         };
@@ -602,7 +570,7 @@ namespace draw {
         template <typename F> struct MapPos final {
             F fn;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::MapPos<T, F> {
+            template <Plane T> constexpr auto operator()(T inner) const noexcept -> draw::MapPos<T, F> {
                 return draw::MapPos<T, F> { inner, fn };
             }
         };
@@ -640,7 +608,7 @@ namespace draw {
         }
     };
 
-    static_assert(SizedPlane<Rectangle>::value);
+    static_assert(SizedPlane<Rectangle>);
 
     struct FilledRectangle final {
         i32 w { 0 }, h { 0 };
@@ -659,14 +627,12 @@ namespace draw {
         }
     };
 
-    static_assert(SizedPlane<FilledRectangle>::value);
+    static_assert(SizedPlane<FilledRectangle>);
 }
 
 // Abstract ------------------------------------------------------------------------------------------------------------
 namespace draw {
-    template <typename T> struct Repeat final {
-        static_assert(SizedPlane<T>::value);
-
+    template <SizedPlane T> struct Repeat final {
         T inner;
 
       public:
@@ -700,7 +666,7 @@ namespace draw {
 
     namespace adapt {
         struct Repeat final {
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> draw::Repeat<T> {
+            template <SizedPlane T> constexpr auto operator()(T inner) const noexcept -> draw::Repeat<T> {
                 return draw::Repeat<T> { inner };
             }
         };
@@ -714,9 +680,7 @@ namespace draw {
 
 // Conditionals --------------------------------------------------------------------------------------------------------
 namespace draw {
-    template <typename Left, typename Right> class EitherPlane final {
-        static_assert(Plane<Left>::value and Plane<Right>::value);
-
+    template <Plane Left, Plane Right> class EitherPlane final {
         enum class Case { L, R } tag;
         bool is_alive { true };
 
@@ -739,16 +703,20 @@ namespace draw {
             }
         }
 
-        constexpr auto width() const noexcept(noexcept(left.width()) and noexcept(right.width())) -> i32 {
-            static_assert(SizedPlane<Left>::value and SizedPlane<Right>::value);
+        constexpr auto width() const noexcept(noexcept(left.width()) and noexcept(right.width())) -> i32
+        requires
+            SizedPlane<Left> and SizedPlane<Right>
+        {
             switch (tag) {
                 case Case::L: return left.width();
                 case Case::R: return right.width();
             }
         }
 
-        constexpr auto height() const noexcept(noexcept(left.height()) and noexcept(right.height())) -> i32 {
-            static_assert(SizedPlane<Left>::value and SizedPlane<Right>::value);
+        constexpr auto height() const noexcept(noexcept(left.height()) and noexcept(right.height())) -> i32
+        requires
+            SizedPlane<Left> and SizedPlane<Right>
+        {
             switch (tag) {
                 case Case::L: return left.height();
                 case Case::R: return right.height();
@@ -770,7 +738,7 @@ namespace draw {
 
             constexpr ApplyIf(bool cond, F const& fn) noexcept : cond(cond), fn(fn) {}
 
-            template <typename T> constexpr auto operator()(T const& inner) const noexcept -> EitherPlane<T, decltype(fn(inner))> {
+            template <Plane T> constexpr auto operator()(T const& inner) const noexcept -> EitherPlane<T, decltype(fn(inner))> {
                 if (not cond) {
                     return EitherPlane<T, decltype(fn(inner))>(inner);
                 } else {
@@ -790,9 +758,7 @@ namespace draw {
 namespace draw {
     enum class MirrorAxis : u8 { X, Y };
 
-    template <const MirrorAxis AXIS, typename T> struct MirroredPlane final {
-        static_assert(SizedPlane<T>::value);
-
+    template <const MirrorAxis AXIS, SizedPlane T> struct MirroredPlane final {
         T inner;
 
         constexpr explicit MirroredPlane(T inner) noexcept : inner(inner) {}
@@ -822,9 +788,7 @@ namespace draw {
         }
     };
 
-    template <typename T> struct RotatedPlane final {
-        static_assert(SizedPlane<T>::value);
-
+    template <SizedPlane T> struct RotatedPlane final {
         T inner;
         i32 rotation_step;
 
@@ -845,7 +809,7 @@ namespace draw {
                 case 3:
                     return inner.height();
             }
-            intr::unreachable();
+            std::unreachable();
         }
 
         constexpr auto height() const noexcept(noexcept(inner.width()) and noexcept(inner.height())) -> i32 {
@@ -857,7 +821,7 @@ namespace draw {
                 case 3:
                     return inner.width();
             }
-            intr::unreachable();
+            std::unreachable();
         }
 
         constexpr auto get(i32 x, i32 y) const noexcept(noexcept(inner.get(inner.width(), inner.height()))) -> Color {
@@ -867,7 +831,7 @@ namespace draw {
                 case 2: return inner.get(inner.width() - 1 - x, inner.height() - 1 - y);
                 case 3: return inner.get(y, inner.height() - 1 - x);
             }
-            intr::unreachable();
+            std::unreachable();
         }
 
         constexpr void set(i32 x, i32 y, Color color) noexcept(noexcept(inner.set(inner.width(), inner.height(), color))) {
@@ -877,13 +841,11 @@ namespace draw {
                 case 2: inner.set(inner.width() - 1 - x, inner.height() - 1 - y, color); break;
                 case 3: inner.set(y, inner.height() - 1 - x, color);                     break;
             }
-            intr::unreachable();
+            std::unreachable();
         }
     };
 
-    template <typename T> struct RotatedGlobalPlane final {
-        static_assert(Plane<T>::value);
-
+    template <Plane T> struct RotatedGlobalPlane final {
         T inner;
         i32 rotation_step;
 
@@ -911,7 +873,7 @@ namespace draw {
                 case 2: return inner.get(-x, -y);
                 case 3: return inner.get(-y, x);
             }
-            intr::unreachable();
+            std::unreachable();
         }
 
         constexpr void set(i32 x, i32 y, Color color) noexcept(noexcept(inner.set(x, y, color))) {
@@ -926,8 +888,7 @@ namespace draw {
 
     namespace adapt {
         template <const MirrorAxis AXIS> struct Mirror final {
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> MirroredPlane<AXIS, T> {
-                static_assert(SizedPlane<T>::value);
+            template <SizedPlane T> constexpr auto operator()(T inner) const noexcept -> MirroredPlane<AXIS, T> {
                 return MirroredPlane<AXIS, T>(inner);
             }
         };
@@ -935,8 +896,7 @@ namespace draw {
         struct Rotate final {
             i32 rotation_step;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> RotatedPlane<T> {
-                static_assert(SizedPlane<T>::value);
+            template <SizedPlane T> constexpr auto operator()(T inner) const noexcept -> RotatedPlane<T> {
                 return RotatedPlane<T>(inner, rotation_step);
             }
         };
@@ -944,8 +904,7 @@ namespace draw {
         struct RotateGlobal final {
             i32 rotation_step;
 
-            template <typename T> constexpr auto operator()(T inner) const noexcept -> RotatedGlobalPlane<T> {
-                static_assert(SizedPlane<T>::value);
+            template <SizedPlane T> constexpr auto operator()(T inner) const noexcept -> RotatedGlobalPlane<T> {
                 return RotatedGlobalPlane<T>(inner, rotation_step);
             }
         };

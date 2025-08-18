@@ -93,6 +93,10 @@ The game itself uses a very standard class structure.
 Do note that the game objects are in the object directory, not src as they are compiled as libraries
 and loaded by the engine proper at runtime as needed.
 
+It is important to note that this depends on RTTI making sense between shared libraries. This is the case
+on Windows or with Apple Clang but it does not work for example with upstream Clang on macOS.
+C++ is a very sad language indeed. I don't care and I won't be using C++ in the future, because it's terrible.
+
 ```
 Game -> Scene
           |-> Stage -> [(dynlib) Object -> [Trait]]

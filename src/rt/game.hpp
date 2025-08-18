@@ -4,6 +4,7 @@
 // The game header defines the traits of a game and provides a default game executor.
 #pragma once
 #include <SDL3/SDL_scancode.h>
+#include <concepts>
 #include <primitive>
 #include <draw>
 #include <font>
@@ -443,13 +444,12 @@ namespace rt {
     /// The catch is, without C++20 modules, this means the run implementation must be a template,
     /// so it is impossible for it to avoid exposing SDL includes, but that's an arbitrary
     /// issue caused by being forced to support old C++.
-    template <typename, typename = draw::Image, typename = void> struct Game : std::false_type {};
-    template <typename Self, typename Target> struct Game<Self, Target, std::enable_if_t<
-        draw::SizedPlane<Target>::value and draw::MutablePlane<Target>::value and
-        std::is_same<decltype(std::declval<Self&>().init(std::declval<Io&>())), void>::value and
-        std::is_same<decltype(std::declval<Self&>().update(std::declval<Io&>(), std::declval<Input const&>())), void>::value and
-        std::is_same<decltype(std::declval<Self const&>().draw(std::declval<Io&>(), std::declval<Input const&>(), std::declval<Target&>())), void>::value
-    >> : std::true_type {};
+    template <typename Self>
+    concept Game = requires(Self const& self, Self& self_mut, draw::Ref<draw::Image> target, Io& io, Input const& input) {
+        { self_mut.init(io) } -> std::same_as<void>;
+        { self_mut.update(io, input) } -> std::same_as<void>;
+        { self.draw(io, input, target) } -> std::same_as<void>;
+    };
 
     /// An error raised while running the game using the default executor.
     struct RunError final {
@@ -473,9 +473,7 @@ namespace rt {
     /// This method was moved from Game into an environment message.
     /// A game cannot run itself, it is run by the platform it's on
     /// and can be run in many ways, this is just one implementation.
-    template <typename G> static void run(G& game, char const* title, i32 scale, i32 width, i32 height) {
-        static_assert(Game<G>::value);
-
+    static void run(Game auto& game, char const* title, i32 scale, i32 width, i32 height) {
         static std::atomic<bool> is_running = false;
 
         if (is_running.load()) {
@@ -677,8 +675,7 @@ namespace rt {
     /// and can be run in many ways, this is just one implementation.
     ///
     /// This overload uses the default window size of 800x600.
-    template <typename G> void run(G& game, char const* title = "Window", i32 scale = 4) {
-        static_assert(Game<G>::value);
+    void run(Game auto& game, char const* title = "Window", i32 scale = 4) {
         run(game, title, scale, 800, 600);
     }
 }

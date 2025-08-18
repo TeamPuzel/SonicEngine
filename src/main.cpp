@@ -43,7 +43,7 @@ class SonicGame final {
         scene->update(io, input);
     }
 
-    void draw(Io& io, rt::Input const& input, draw::Image& target) const {
+    void draw(Io& io, rt::Input const& input, draw::Ref<draw::Image> target) const {
         scene->draw(io, input, target, sheet, background);
     }
 };

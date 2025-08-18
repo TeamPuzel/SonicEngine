@@ -9,6 +9,8 @@
 // The header also asserts that certain poorly defined operations evaluate as expected.
 #pragma once
 #include <type_traits>
+#include <typeinfo>
+#include <string_view>
 
 using char16 = char16_t;
 using char32 = char32_t;
@@ -96,14 +98,16 @@ namespace math {
     }
 }
 
-namespace intr {
-    #ifdef _MSC_VER
-    [[noreturn]] inline void unreachable() {
-        __assume(0);
-    }
-    #else
-    [[noreturn]] [[clang::always_inline]] inline void unreachable() {
-        __builtin_unreachable();
-    }
-    #endif
+/// Some compilers are weird and compare this differently which breaks across shared libraries.
+/// This is a more sane dynamic cast which should work across the same ABI. Ugh. C++ is a sad language.
+///
+/// It is meant for flat inheritance hierachies and will not work otherwise.
+template <typename T, typename U> auto flat_cast(U* ptr) noexcept -> T* {
+    std::string_view t = typeid(T).name(), u = typeid(*ptr).name();
+    if (t == u) return (T*) ptr; else return nullptr;
+}
+
+template <typename T, typename U> auto flat_cast(U const* ptr) noexcept -> T const* {
+    std::string_view t = typeid(T).name(), u = typeid(*ptr).name();
+    if (t == u) return (T const*) ptr; else return nullptr;
 }

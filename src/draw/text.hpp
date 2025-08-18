@@ -12,9 +12,7 @@
 #include "image.hpp"
 
 namespace draw {
-    template <typename T> struct Symbol final {
-        static_assert(Plane<T>::value);
-
+    template <Plane T> struct Symbol final {
         enum class Type {
             Glyph,
             Space,
@@ -39,9 +37,7 @@ namespace draw {
         }
     };
 
-    template <typename T, typename Chr> struct Font final {
-        static_assert(Plane<T>::value);
-
+    template <Plane T, typename Chr> struct Font final {
         T source;
         i32 height;
         i32 baseline;
@@ -61,7 +57,7 @@ namespace draw {
     ///
     /// The view type used is generic because C++17 is sad and as usual the version prior to anything nice.
     /// Not that it's much better now anyway.
-    template <typename T, typename Str = std::string_view> struct Text final {
+    template <Plane T, typename Str = std::string_view> struct Text final {
         using StringView = Str;
         using Char = typename Str::value_type;
 
@@ -132,5 +128,5 @@ namespace draw {
 
     template <typename T> Text(char const*, Font<T, char>, Color = color::WHITE) -> Text<T, std::string_view>;
 
-    static_assert(SizedPlane<Text<Image>>::value);
+    static_assert(SizedPlane<Text<Image>>);
 }

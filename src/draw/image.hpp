@@ -3,9 +3,6 @@
 //
 // This defines the simplest possible primitive.
 // It's not the most primitive however, that title belongs to the InfiniteImage.
-//
-// TODO:
-// - Replace std::vector with core::Array to guarantee valid zero initialization.
 #pragma once
 #include <primitive>
 #include <vector>
@@ -86,8 +83,7 @@ namespace draw {
             return data.data();
         }
 
-        template <typename U> static auto flatten(U const& other) -> Image {
-            static_assert(SizedPlane<U>::value);
+        template <SizedPlane U> static auto flatten(U const& other) -> Image {
             return Image(other.width(), other.height(), [&] (i32 x, i32 y) -> Color {
                 return other.get(x, y);
             });
@@ -95,7 +91,7 @@ namespace draw {
     };
 
     // Assert that our type properly satisfies the desired interface.
-    static_assert(MutablePlane<Image>::value and SizedPlane<Image>::value);
+    static_assert(SizedPlane<Image> and MutablePlane<Image>);
 
     class TgaImage final {
         std::vector<u8> data;
@@ -129,5 +125,5 @@ namespace draw {
     };
 
     // Assert that our type properly satisfies the desired interface.
-    static_assert(SizedPlane<TgaImage>::value);
+    static_assert(SizedPlane<TgaImage>);
 }

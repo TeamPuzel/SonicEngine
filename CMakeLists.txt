@@ -1,7 +1,10 @@
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_CXX_COMPILER clang++)
+
 cmake_minimum_required(VERSION 3.21)
 project(Sonic C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Account for MSVC/clang-cl switch based interface when configuring flags.
