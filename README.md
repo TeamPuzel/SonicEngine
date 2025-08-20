@@ -1,3 +1,5 @@
+This project is archived because I don't want to touch C++ again after this and I'll just maintain this in Rust instead.
+
 # Sonic
 
 An implementation of a generic, extensible Sonic engine designed to be small in implementation and fun to use.
