@@ -512,8 +512,8 @@ namespace rt {
         auto renderer = SDL_CreateRenderer(window, nullptr);
         if (not renderer) {
             throw RunError {
-                .reason = RunError::Reason::CouldNotCreateRenderer,
-                .description = SDL_GetError(),
+                RunError::Reason::CouldNotCreateRenderer,
+                SDL_GetError(),
             };
         }
         // We can discard the error, it is inefficient not to use vsync but if a platform doesn't support it
