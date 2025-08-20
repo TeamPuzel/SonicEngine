@@ -4,10 +4,9 @@
 // This header defines utilities for safely reloading object classes at runtime.
 #pragma once
 #include <rt>
-#include <type_traits>
 
 #if defined(_MSC_VER)
-#define DLLEXPORT __declspec(dllexport)
+#define DLLEXPORT [[gnu::dllexport]]
 #else
 #define DLLEXPORT
 #endif
@@ -53,6 +52,16 @@ namespace sonic {
     >> : std::true_type {};
 
     using ObjectRebuilder    = auto (*) (Object const&) -> Box<Object>;
-    using ObjectDeserializer = auto (*) (rt::BinaryReader&, i32 x, i32 y) -> Box<Object>;
     using ObjectSerializer   = auto (*) (Object const&, rt::BinaryWriter&) -> void;
+    using ObjectDeserializer = auto (*) (rt::BinaryReader&, i32 x, i32 y) -> Box<Object>;
+
+    // /// A game object loadable from files and hot-reloadable during gameplay.
+    // /// Obviously don't attempt rebuilding if the ABI was broken between reloads.
+    // template <typename Self> concept DynamicObject = requires(
+    //     Object const& self, rt::BinaryReader& r, rt::BinaryWriter& w, i32 x, i32 y
+    // ) {
+    //     { &Self::rebuild } -> std::same_as<ObjectRebuilder>;
+    //     { &Self::serialize } -> std::same_as<ObjectSerializer>;
+    //     { &Self::deserialize } -> std::same_as<ObjectDeserializer>;
+    // };
 }

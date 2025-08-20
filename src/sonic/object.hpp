@@ -258,7 +258,7 @@ namespace sonic {
     /// TODO: This is stupid, just put it in the Object supertype and use newer C++ deducing this.
     /// I was made to use C++17 though so we shall still use silly CRTP patterns :)
     template <typename Self> struct DefaultCodable {
-        static auto rebuild(Self const& existing) -> Box<Object> {
+        static auto rebuild(Object const& existing) -> Box<Object> {
             auto ret = Box<Self>::make();
             ret->position = existing.position;
             ret->speed = existing.speed;
@@ -273,7 +273,7 @@ namespace sonic {
             return ret;
         }
 
-        static void serialize(Self const& self, rt::BinaryWriter& writer) {
+        static void serialize(Object const& self, rt::BinaryWriter& writer) {
             // TODO: Serialize basics and classname.
         }
     };
