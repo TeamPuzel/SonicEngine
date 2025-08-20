@@ -2,53 +2,17 @@
 
 An implementation of a generic, extensible Sonic engine designed to be small in implementation and fun to use.
 
-## About the project
-
-Why this game:
-- Interesting physics more involved than most tile based games.
-- I always wanted to implement a sonic game.
-- I think the sonic fan game space would benefit from an open and portable engine.
-- I had no other 2d game ideas.
-
-## My version
-
-The minimum I will definitely make:
-- The first and most iconic Sonic level, Act 1 of Green Hill Zone from the first game.
-- Make sure the code can compile in C++17 mode.
-- Hot reloading of game object classes at runtime (really cool).
-- Try to ensure it compiles in sad environments like Visual Studio.
-
-If I have the time I will also make:
-- Act 2 and 3 since they share most of their assets with the first stage. (Spoke too soon, the physics were hard to implement)
-
 ## Getting started
 
-The project can be built using Visual Studio or the terminal. The dependencies are:
+The dependencies are:
 
 - C++ standard library
 - SDL3
-
-Simply open the project **directory** in Visual Studio. You might have to wait a moment for it to configure the project.
-There are Visual Studio specific files but no solution file. It works and I don't have to configure
-anything twice this way, which is pretty important with a more advanced runtime model.
-
-Note that there are many targets because objects are built as hot-reloadable libraries.
-Use `Build > Build All` (Ctrl+Shift+B) to build all the targets at once.
-If you don't do that the engine will not find the objects when deserializing the level and throw.
-
-The way I configured the Visual Studio project it might ask to install additional components if they
-were skipped during the initial Visual Studio installation process. Nowadays Visual Studio has the convenient
-option in the menu to use a more robust compiler, which doesn't change much except you don't need stars to align
-for it to reliably compile code... :(
-
-Besides the hereby documented Visual Studio jank it otherwise works fine. I did my best to get it working
-more simply
 
 ## How to play
 
 The controls can be operated in left handed and right handed modes:
 - Move with arrow keys and jump with X
-- Move with WASD keys and jump with ENTER
 - Hold down to crouch while standing still or roll up while moving.
 - Hold down and the jump button while still to charge up a spindash.
 - (Misc) + and - keys adjust the integer scale the game is rendering at, the default is 3x.
@@ -61,8 +25,6 @@ The controls can be operated in left handed and right handed modes:
 - (Windows) Press F1 to toggle fullscreen since afaik the OS doesn't handle that at user-level.
 - (Development) Press R to hot reload object classes (Windows only, on UNIX a reload will automatically signal the binary)
 
-There were no other abilities in Sonic 1 yet.
-
 ---
 
 ## Project structure
@@ -74,14 +36,13 @@ There were no other abilities in Sonic 1 yet.
 - object — The object plugin implementations, source code and headers.
 - tools — Python scripts used to generate the sine/cosine tables etc.
 - windows — Windows cross compilation toolchain and libraries.
-- map — My binary file format extension to Tiled and the Tiled map project files.
+- map [DEPRECATED] — My binary file format extension to Tiled and the Tiled map project files.
 - res — Resources used by the game.
 - ref — References for making resources such as unedited sprite sheets found online.
 
 ### Build setup
 
 - CMakeLists.txt — Build specification.
-- CMakeSettings.json — Makes Visual Studio set up dependencies correctly on Windows.
 - file_format_spec.txt — The specification of the binary file formats used.
 - makefile — Conveniences for performing various tasks on the project.
 
@@ -265,10 +226,6 @@ into the function signature itself. All side effects are encapsulated within. I 
 their new design is really cool.
 
 ---
-
-## Contact
-
-TODO
 
 ## Acknowledgements
 
